@@ -1,7 +1,7 @@
 import { useAuth } from '../../context/AuthContext';
 import { useApp } from '../../context/AppContext';
 import { cn } from '../../lib/utils';
-import { LogOut, LayoutDashboard, History, User } from 'lucide-react';
+import { LogOut, LayoutDashboard, History, User, Compass } from 'lucide-react';
 import type { ActiveView } from '../../types';
 
 interface NavItem {
@@ -16,7 +16,13 @@ const NAV_ITEMS: NavItem[] = [
   { view: 'settings', label: 'Profile', icon: User },
 ];
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  onNavigateLanding,
+}: {
+  children: React.ReactNode;
+  onNavigateLanding?: () => void;
+}) {
   const { signOut } = useAuth();
   const { activeView, setActiveView, activeTimer } = useApp();
 
@@ -29,9 +35,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-dvh flex flex-col bg-canvas">
       {/* Desktop Header */}
       <header className="hidden md:flex items-center justify-between px-6 h-14 border-b border-edge/50 bg-surface/50 backdrop-blur-sm sticky top-0 z-40">
-        <h1 className="text-base font-semibold tracking-tight text-zinc-100">
-          Mastery
-        </h1>
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            onClick={onNavigateLanding}
+            className="text-base font-semibold tracking-tight text-zinc-100 flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"
+            title="View Landing Page & Philosophy"
+          >
+            <span className="text-accent text-sm">⚡</span>
+            <span>Mastery</span>
+          </button>
+        </div>
 
         <nav className="flex items-center gap-1">
           {NAV_ITEMS.map((item) => (
@@ -49,6 +63,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               {item.label}
             </button>
           ))}
+
+          {onNavigateLanding && (
+            <button
+              type="button"
+              onClick={onNavigateLanding}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-zinc-500 hover:text-zinc-300 hover:bg-elevated/50 transition-colors duration-150 cursor-pointer"
+              title="Philosophy & Landing"
+            >
+              <Compass size={14} />
+              <span>About</span>
+            </button>
+          )}
 
           <div className="w-px h-5 bg-edge mx-2" />
 

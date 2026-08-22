@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { SkillCard } from '../skills/SkillCard';
 import { CreateSkillModal } from '../skills/CreateSkillModal';
 import { Button } from '../ui/Button';
+import { MasteryLevelCard } from './MasteryLevelCard';
 import {
   formatDuration,
   formatRelativeTime,
@@ -15,8 +16,10 @@ export function Dashboard() {
     sessions,
     skillProgress,
     streak,
-    totalHours,
+    totalSeconds,
     todaySeconds,
+    totalXP,
+    globalLevelInfo,
     startTimer,
   } = useApp();
 
@@ -26,14 +29,22 @@ export function Dashboard() {
   const hasSkills = skills.length > 0;
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-6 sm:space-y-8 animate-fade-in">
+      {/* ── Global Mastery Level Banner ───────────────────────── */}
+      {hasSkills && (
+        <MasteryLevelCard
+          levelInfo={globalLevelInfo}
+          totalXP={totalXP}
+        />
+      )}
+
       {/* ── Stats Row ────────────────────────────────────────── */}
       {hasSkills ? (
         <div className="grid grid-cols-3 gap-3">
           <StatCard
             icon={<Clock size={16} className="text-accent" />}
-            label="Total"
-            value={`${totalHours}h`}
+            label="Total Practice"
+            value={formatDuration(totalSeconds)}
           />
           <StatCard
             icon={<Zap size={16} className="text-warning" />}
@@ -60,7 +71,7 @@ export function Dashboard() {
 
         const { skill, nextMilestone } = candidate;
         return (
-          <section className="rounded-card bg-gradient-to-br from-surface to-elevated border border-edge p-5 shadow-lg shadow-black/20">
+          <section className="rounded-2xl bg-gradient-to-br from-surface via-surface to-elevated/90 border border-edge p-5 shadow-lg shadow-black/20">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-start gap-3.5 min-w-0">
                 <div
@@ -69,9 +80,9 @@ export function Dashboard() {
                 >
                   {skill.icon}
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 space-y-0.5">
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-semibold text-accent uppercase tracking-wider">
+                    <span className="text-[10px] font-bold text-accent uppercase tracking-wider">
                       Up next
                     </span>
                     {nextMilestone ? (
@@ -80,11 +91,15 @@ export function Dashboard() {
                       </span>
                     ) : null}
                   </div>
-                  <h3 className="text-base font-semibold text-zinc-100 truncate mt-0.5">
+                  <h3 className="text-base font-bold text-zinc-100 truncate">
                     {skill.name}
                   </h3>
-                  <p className="text-xs text-zinc-400 mt-0.5">
-                    {candidate.totalHours}h invested of {skill.targetHours}h goal
+                  <p className="text-xs text-zinc-400">
+                    <span className="font-semibold text-zinc-200">
+                      {formatDuration(candidate.totalSeconds)}
+                    </span>
+                    {' invested of '}
+                    {skill.targetHours}h goal
                   </p>
                 </div>
               </div>
@@ -93,7 +108,7 @@ export function Dashboard() {
                 variant="primary"
                 size="md"
                 onClick={() => startTimer(skill.id)}
-                className="w-full sm:w-auto font-medium flex-shrink-0 shadow-md shadow-accent/20"
+                className="w-full sm:w-auto font-medium flex-shrink-0 shadow-md shadow-accent/20 cursor-pointer"
               >
                 <Zap size={16} />
                 Start Focus Session
@@ -105,18 +120,19 @@ export function Dashboard() {
 
       {/* ── Skills ───────────────────────────────────────────── */}
       <section>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-zinc-100">
-            {hasSkills ? 'Your skills' : ''}
+        <div className="flex items-center justify-between mb-3.5">
+          <h2 className="text-base sm:text-lg font-bold text-zinc-100">
+            {hasSkills ? 'Your Skills' : ''}
           </h2>
           {hasSkills ? (
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setShowCreateSkill(true)}
+              className="text-zinc-400 hover:text-zinc-100"
             >
               <Plus size={16} />
-              Add
+              Add Skill
             </Button>
           ) : null}
         </div>
@@ -157,8 +173,8 @@ export function Dashboard() {
       {/* ── Recent Sessions ──────────────────────────────────── */}
       {recentSessions.length > 0 ? (
         <section>
-          <h2 className="text-sm font-medium text-zinc-400 mb-3">
-            Recent sessions
+          <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-3">
+            Recent Sessions
           </h2>
           <div className="space-y-1.5">
             {recentSessions.map((session) => {
@@ -166,13 +182,13 @@ export function Dashboard() {
               return (
                 <div
                   key={session.id}
-                  className="flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-surface transition-colors duration-150"
+                  className="flex items-center gap-3 py-2 px-3 rounded-xl bg-surface/40 hover:bg-surface border border-edge/30 transition-colors duration-150"
                 >
                   <span className="text-sm">{skill?.icon ?? '🎯'}</span>
-                  <span className="text-sm text-zinc-300 truncate flex-1">
-                    {skill?.name ?? 'Unknown skill'}
+                  <span className="text-sm text-zinc-300 font-medium truncate flex-1">
+                    {skill?.name ?? 'Deliberate Practice'}
                   </span>
-                  <span className="text-xs text-zinc-500 tabular-nums">
+                  <span className="text-xs text-zinc-400 font-semibold tabular-nums">
                     {formatDuration(session.durationSeconds)}
                   </span>
                   <span className="text-xs text-zinc-600 min-w-[60px] text-right">
@@ -206,14 +222,14 @@ function StatCard({
   value: string;
 }) {
   return (
-    <div className="rounded-card bg-surface border border-edge/30 p-3 text-center">
+    <div className="rounded-2xl bg-surface/80 border border-edge/50 p-3 text-center shadow-sm">
       <div className="flex items-center justify-center gap-1.5 mb-1">
         {icon}
-        <span className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider">
+        <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
           {label}
         </span>
       </div>
-      <p className="text-lg font-bold text-zinc-100 tabular-nums">{value}</p>
+      <p className="text-base sm:text-lg font-bold text-zinc-100 tabular-nums">{value}</p>
     </div>
   );
 }

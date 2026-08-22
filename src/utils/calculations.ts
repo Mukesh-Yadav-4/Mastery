@@ -4,32 +4,47 @@ import type {
   SkillProgress,
   StreakData,
   MilestoneRecord,
+  LevelInfo,
 } from '../types';
-import { MILESTONE_PERCENTAGES } from '../lib/constants';
+import {
+  MILESTONE_PERCENTAGES,
+  LEVEL_XP_THRESHOLDS,
+  SESSION_COMPLETION_BONUS_TIERS,
+} from '../lib/constants';
 
 // ── Time Formatting ───────────────────────────────────────────
 
-/** Format seconds as "1h 23m", "45m", or "0m" */
+/**
+ * Canonical duration formatting system.
+ * Uses stored seconds as the single source of truth.
+ *
+ * Rules:
+ * - < 60 seconds      → "42s" (e.g. "1s", "0s")
+ * - 60s to < 1 hour   → "1m", "42m"
+ * - 1 hour+           → "1h 04m", "1h 00m"
+ */
 export function formatDuration(totalSeconds: number): string {
-  if (totalSeconds < 0) return '0m';
+  if (totalSeconds <= 0) return '0s';
 
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const secs = Math.floor(totalSeconds);
+  if (secs < 60) {
+    return `${secs}s`;
+  }
 
-  if (hours === 0) return `${minutes}m`;
-  if (minutes === 0) return `${hours}h`;
-  return `${hours}h ${minutes}m`;
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) {
+    return `${mins}m`;
+  }
+
+  const hrs = Math.floor(secs / 3600);
+  const remMins = Math.floor((secs % 3600) / 60);
+  const padMins = remMins.toString().padStart(2, '0');
+  return `${hrs}h ${padMins}m`;
 }
 
-/** Format seconds as "12h 30m" for larger durations */
+/** Format seconds as "1h 04m" or "42m" (canonical formatDuration) */
 export function formatHoursMinutes(totalSeconds: number): string {
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-
-  if (hours === 0 && minutes === 0) return '0m';
-  if (hours === 0) return `${minutes}m`;
-  if (minutes === 0) return `${hours}h 0m`;
-  return `${hours}h ${minutes}m`;
+  return formatDuration(totalSeconds);
 }
 
 /** Format seconds as timer display "01:23:45" or "23:45" */
@@ -100,19 +115,23 @@ export function getSkillTotalSeconds(
   sessions: FocusSession[],
 ): number {
   return sessions
-    .filter((s) => s.skillId === skillId)
+    .filter((s) => s.skillId === skillId && s.status === 'completed')
     .reduce((acc, s) => acc + s.durationSeconds, 0);
 }
 
-/** Get total seconds across all sessions */
+/** Get total seconds across all completed sessions */
 export function getTotalSeconds(sessions: FocusSession[]): number {
-  return sessions.reduce((acc, s) => acc + s.durationSeconds, 0);
+  return sessions
+    .filter((s) => s.status === 'completed')
+    .reduce((acc, s) => acc + s.durationSeconds, 0);
 }
 
 /** Get sessions completed today */
 export function getTodaySessions(sessions: FocusSession[]): FocusSession[] {
   const today = getTodayDateString();
-  return sessions.filter((s) => getLocalDateString(s.startedAt) === today);
+  return sessions.filter(
+    (s) => s.status === 'completed' && getLocalDateString(s.startedAt) === today,
+  );
 }
 
 /** Get total seconds practiced today */
@@ -123,7 +142,118 @@ export function getTodayTotalSeconds(sessions: FocusSession[]): number {
   );
 }
 
-// ── Skill Progress ────────────────────────────────────
+// ── XP & Level Progression Engine ─────────────────────────────
+
+/**
+ * Calculate detailed XP breakdown for a focus session.
+ * - 1 minute of completed practice = 1 base XP.
+ * - Adds completion bonus for completed sessions based on duration tier.
+ * - Cancelled sessions earn 0 bonus XP.
+ */
+export function getSessionXPBreakdown(
+  durationSeconds: number,
+  status: 'completed' | 'cancelled' = 'completed',
+): {
+  baseXP: number;
+  bonusXP: number;
+  totalXP: number;
+} {
+  if (durationSeconds <= 0) {
+    return { baseXP: 0, bonusXP: 0, totalXP: 0 };
+  }
+
+  const minutes = Math.floor(durationSeconds / 60);
+  const baseXP = minutes;
+
+  if (status === 'cancelled') {
+    return { baseXP, bonusXP: 0, totalXP: baseXP };
+  }
+
+  let bonusXP = 0;
+  for (const tier of SESSION_COMPLETION_BONUS_TIERS) {
+    if (minutes >= tier.minMinutes) {
+      bonusXP = tier.bonusXP;
+      break;
+    }
+  }
+
+  return {
+    baseXP,
+    bonusXP,
+    totalXP: baseXP + bonusXP,
+  };
+}
+
+/** Calculate total XP awarded for a session */
+export function calculateSessionXP(
+  durationSeconds: number,
+  status: 'completed' | 'cancelled' = 'completed',
+): number {
+  return getSessionXPBreakdown(durationSeconds, status).totalXP;
+}
+
+/** Calculate cumulative XP threshold required to reach a specific level */
+export function calculateLevelThreshold(level: number): number {
+  if (level <= 1) return 0;
+  if (level <= 15) return LEVEL_XP_THRESHOLDS[level];
+
+  // For Level > 15: smooth gradual progression curve
+  let xp = LEVEL_XP_THRESHOLDS[15];
+  for (let l = 16; l <= level; l++) {
+    const step = 400 + (l - 15) * 50;
+    xp += step;
+  }
+  return xp;
+}
+
+/** Calculate comprehensive level info from cumulative total XP */
+export function calculateLevelInfo(totalXP: number): LevelInfo {
+  const safeXP = Math.max(0, Math.floor(totalXP));
+  let level = 1;
+
+  while (calculateLevelThreshold(level + 1) <= safeXP) {
+    level++;
+  }
+
+  const currentLevelXP = calculateLevelThreshold(level);
+  const nextLevelXP = calculateLevelThreshold(level + 1);
+  const xpInCurrentLevel = safeXP - currentLevelXP;
+  const xpRequiredForNextLevel = nextLevelXP - currentLevelXP;
+  const xpToNextLevel = Math.max(0, nextLevelXP - safeXP);
+  const progressPercentage = Math.min(
+    100,
+    Math.max(0, (xpInCurrentLevel / xpRequiredForNextLevel) * 100),
+  );
+
+  return {
+    level,
+    currentLevelXP,
+    nextLevelXP,
+    xpInCurrentLevel,
+    xpRequiredForNextLevel,
+    xpToNextLevel,
+    progressPercentage,
+  };
+}
+
+/** Get total XP earned across all completed sessions */
+export function getGlobalTotalXP(sessions: FocusSession[]): number {
+  return sessions
+    .filter((s) => s.status === 'completed')
+    .reduce((acc, s) => acc + calculateSessionXP(s.durationSeconds, s.status), 0);
+}
+
+/** Get total XP earned for a specific skill */
+export function getSkillTotalXP(
+  skillId: string,
+  sessions: FocusSession[],
+): number {
+  return sessions
+    .filter((s) => s.skillId === skillId && s.status === 'completed')
+    .reduce((acc, s) => acc + calculateSessionXP(s.durationSeconds, s.status), 0);
+}
+
+// ── Skill Progress ────────────────────────────────────────────
 
 /** Calculate complete progress data for a single skill */
 export function getSkillProgress(
@@ -151,6 +281,9 @@ export function getSkillProgress(
   const nextMilestone =
     MILESTONE_PERCENTAGES.find((p) => !unlockedMilestones.includes(p)) ?? null;
 
+  const skillXP = getSkillTotalXP(skill.id, sessions);
+  const skillLevel = calculateLevelInfo(skillXP);
+
   return {
     skill,
     totalSeconds,
@@ -159,6 +292,8 @@ export function getSkillProgress(
     currentMilestone,
     nextMilestone,
     unlockedMilestones,
+    skillXP,
+    skillLevel,
   };
 }
 
@@ -183,7 +318,9 @@ export function getAllSkillProgress(
  * - If the last practice was 2+ days ago, the streak is 0.
  */
 export function calculateStreak(sessions: FocusSession[]): StreakData {
-  if (sessions.length === 0) {
+  const completedSessions = sessions.filter((s) => s.status === 'completed');
+
+  if (completedSessions.length === 0) {
     return {
       currentStreak: 0,
       longestStreak: 0,
@@ -194,7 +331,7 @@ export function calculateStreak(sessions: FocusSession[]): StreakData {
 
   // Build set of unique practice dates
   const practiceDates = new Set<string>();
-  for (const session of sessions) {
+  for (const session of completedSessions) {
     practiceDates.add(getLocalDateString(session.startedAt));
   }
 

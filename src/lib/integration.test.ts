@@ -16,6 +16,9 @@ import {
   getSkillProgress,
   calculateStreak,
   formatPercentage,
+  getGlobalTotalXP,
+  getSkillTotalXP,
+  calculateLevelInfo,
 } from '../utils/calculations';
 import type { TimerState } from '../types';
 
@@ -46,7 +49,7 @@ beforeEach(() => {
 });
 
 describe('Full Mastery V0.1 User Journey', () => {
-  it('executes the full mastery loop: Sign Up -> Create Skill -> Practice -> Milestones -> Streak -> Refresh', () => {
+  it('executes the full mastery loop: Sign Up -> Create Skill -> Practice -> Milestones -> Streak -> XP/Level -> Refresh', () => {
     // 1. SIGN UP
     const user = signUp('mastery_user@example.com', 'supersecret123');
     expect(user.id).toBeTruthy();
@@ -74,6 +77,8 @@ describe('Full Mastery V0.1 User Journey', () => {
     expect(initialProgress.percentage).toBe(0);
     expect(initialProgress.nextMilestone).toBe(10);
     expect(initialProgress.currentMilestone).toBe(0);
+    expect(initialProgress.skillXP).toBe(0);
+    expect(initialProgress.skillLevel.level).toBe(1);
 
     // 3. START SESSION
     const startTime = Date.now() - 3600000 * 10; // 10 hours ago
@@ -129,9 +134,18 @@ describe('Full Mastery V0.1 User Journey', () => {
     expect(storedSessions).toHaveLength(1);
     expect(storedSessions[0].id).toBe(completedSession.id);
 
-    // 7. PROGRESS UPDATED
+    // 7. PROGRESS & XP/LEVEL UPDATED
     const exactHours = storedSessions[0].durationSeconds / 3600;
     expect(exactHours).toBe(10);
+
+    // 10 hours = 600 min -> 600 base + 15 bonus = 615 XP
+    const globalXP = getGlobalTotalXP(storedSessions);
+    expect(globalXP).toBe(615);
+    const skillXP = getSkillTotalXP(skill.id, storedSessions);
+    expect(skillXP).toBe(615);
+
+    const levelInfo = calculateLevelInfo(globalXP);
+    expect(levelInfo.level).toBe(7); // Level 7 threshold is 525, Level 8 is 700
 
     // 8. MILESTONES DETECTED & SAVED (10h out of 100h = 10%)
     const newMilestones = checkAndCreateMilestones(
@@ -155,6 +169,8 @@ describe('Full Mastery V0.1 User Journey', () => {
     expect(formatPercentage(updatedProgress.percentage)).toBe('10%');
     expect(updatedProgress.currentMilestone).toBe(10);
     expect(updatedProgress.nextMilestone).toBe(25);
+    expect(updatedProgress.skillXP).toBe(615);
+    expect(updatedProgress.skillLevel.level).toBe(7);
 
     // 9. STREAK UPDATED
     const streak = calculateStreak(storedSessions);
@@ -179,6 +195,8 @@ describe('Full Mastery V0.1 User Journey', () => {
     expect(refreshedProgress.totalHours).toBe(10);
     expect(refreshedProgress.currentMilestone).toBe(10);
     expect(refreshedProgress.nextMilestone).toBe(25);
+    expect(refreshedProgress.skillXP).toBe(615);
+    expect(refreshedProgress.skillLevel.level).toBe(7);
 
     // 11. SUBSEQUENT SESSION PUSHES TO 25% MILESTONE
     createSession(
@@ -186,7 +204,7 @@ describe('Full Mastery V0.1 User Journey', () => {
       skill.id,
       Date.now() - 3600000 * 15,
       Date.now(),
-      15 * 3600, // 15 hours
+      15 * 3600, // 15 hours = 900 min -> 900 base + 15 bonus = 915 XP
     );
 
     const allSessions = getSessions(user.id);
@@ -210,5 +228,7 @@ describe('Full Mastery V0.1 User Journey', () => {
     expect(finalProgress.percentage).toBe(25);
     expect(finalProgress.currentMilestone).toBe(25);
     expect(finalProgress.nextMilestone).toBe(50);
+    expect(finalProgress.skillXP).toBe(615 + 915); // 1530 XP
+    expect(finalProgress.skillLevel.level).toBe(11); // Level 11 is 1350, Level 12 is 1575
   });
 });

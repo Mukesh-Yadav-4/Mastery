@@ -17,6 +17,8 @@ import type {
   ActiveView,
   NewSkillData,
   CelebrationData,
+  SessionRewardData,
+  LevelInfo,
 } from '../types';
 import { useAuth } from './AuthContext';
 import * as db from '../lib/database';
@@ -26,6 +28,10 @@ import {
   getTodayTotalSeconds,
   getTotalSeconds,
   secondsToHours,
+  getGlobalTotalXP,
+  getSkillTotalXP,
+  calculateLevelInfo,
+  getSessionXPBreakdown,
 } from '../utils/calculations';
 import { MIN_SESSION_DURATION_SECONDS } from '../lib/constants';
 
@@ -37,7 +43,10 @@ interface AppContextValue {
   skillProgress: SkillProgress[];
   streak: StreakData;
   totalHours: number;
+  totalSeconds: number;
   todaySeconds: number;
+  totalXP: number;
+  globalLevelInfo: LevelInfo;
 
   // Views
   activeView: ActiveView;
@@ -55,9 +64,11 @@ interface AppContextValue {
   createSkill: (data: NewSkillData) => void;
   archiveSkill: (skillId: string) => void;
 
-  // Celebration
+  // Celebration & Rewards
   celebration: CelebrationData | null;
   dismissCelebration: () => void;
+  sessionReward: SessionRewardData | null;
+  dismissSessionReward: () => void;
 
   // Refresh
   refreshData: () => void;
@@ -74,6 +85,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [activeView, setActiveView] = useState<ActiveView>('dashboard');
   const [activeTimer, setActiveTimer] = useState<TimerState | null>(null);
   const [celebration, setCelebration] = useState<CelebrationData | null>(null);
+  const [sessionReward, setSessionReward] = useState<SessionRewardData | null>(null);
 
   // Load data when user changes
   const loadData = useCallback(() => {
@@ -120,14 +132,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const streak = useMemo(() => calculateStreak(sessions), [sessions]);
 
-  const totalHours = useMemo(
-    () => secondsToHours(getTotalSeconds(sessions)),
+  const totalSeconds = useMemo(
+    () => getTotalSeconds(sessions),
     [sessions],
+  );
+
+  const totalHours = useMemo(
+    () => secondsToHours(totalSeconds),
+    [totalSeconds],
   );
 
   const todaySeconds = useMemo(
     () => getTodayTotalSeconds(sessions),
     [sessions],
+  );
+
+  const totalXP = useMemo(
+    () => getGlobalTotalXP(sessions),
+    [sessions],
+  );
+
+  const globalLevelInfo = useMemo(
+    () => calculateLevelInfo(totalXP),
+    [totalXP],
   );
 
   // ── Timer Actions ─────────────────────────────────────────
@@ -197,6 +224,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // Capture pre-completion progression states
+    const preSessions = db.getSessions(user.id);
+    const preGlobalXP = getGlobalTotalXP(preSessions);
+    const preGlobalLevel = calculateLevelInfo(preGlobalXP);
+    const preSkillXP = getSkillTotalXP(activeTimer.skillId, preSessions);
+    const preSkillLevel = calculateLevelInfo(preSkillXP);
+
     // Save session
     db.createSession(
       user.id,
@@ -206,11 +240,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
       durationSeconds,
     );
 
-    // Check for new milestones
+    // Capture post-completion progression states
     const updatedSessions = db.getSessions(user.id);
+    const postGlobalXP = getGlobalTotalXP(updatedSessions);
+    const postGlobalLevel = calculateLevelInfo(postGlobalXP);
+    const postSkillXP = getSkillTotalXP(activeTimer.skillId, updatedSessions);
+    const postSkillLevel = calculateLevelInfo(postSkillXP);
+
+    const xpBreakdown = getSessionXPBreakdown(durationSeconds, 'completed');
     const skill = skills.find((s) => s.id === activeTimer.skillId);
 
     if (skill) {
+      // Set session reward modal data
+      setSessionReward({
+        skillName: skill.name,
+        skillIcon: skill.icon,
+        skillColor: skill.color,
+        durationSeconds,
+        earnedXP: xpBreakdown.totalXP,
+        baseXP: xpBreakdown.baseXP,
+        bonusXP: xpBreakdown.bonusXP,
+        previousLevelInfo: preGlobalLevel,
+        newLevelInfo: postGlobalLevel,
+        didLevelUp: postGlobalLevel.level > preGlobalLevel.level,
+        previousSkillLevelInfo: preSkillLevel,
+        newSkillLevelInfo: postSkillLevel,
+        didSkillLevelUp: postSkillLevel.level > preSkillLevel.level,
+      });
+
+      // Check for new milestone unlocks
       const totalSeconds = updatedSessions
         .filter((s) => s.skillId === skill.id)
         .reduce((acc, s) => acc + s.durationSeconds, 0);
@@ -223,7 +281,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         skill.targetHours,
       );
 
-      // Trigger celebration for the highest new milestone
+      // Trigger milestone celebration for highest new milestone if reached
       if (newMilestones.length > 0) {
         const highest = newMilestones.reduce((a, b) =>
           a.percentage > b.percentage ? a : b,
@@ -272,10 +330,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [user, loadData],
   );
 
-  // ── Celebration ───────────────────────────────────────────
+  // ── Celebration & Reward Dismissal ────────────────────────
 
   const dismissCelebration = useCallback(() => {
     setCelebration(null);
+  }, []);
+
+  const dismissSessionReward = useCallback(() => {
+    setSessionReward(null);
   }, []);
 
   // ── Refresh ───────────────────────────────────────────────
@@ -293,7 +355,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         skillProgress,
         streak,
         totalHours,
+        totalSeconds,
         todaySeconds,
+        totalXP,
+        globalLevelInfo,
         activeView,
         setActiveView,
         activeTimer,
@@ -306,6 +371,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         archiveSkill: handleArchiveSkill,
         celebration,
         dismissCelebration,
+        sessionReward,
+        dismissSessionReward,
         refreshData,
       }}
     >

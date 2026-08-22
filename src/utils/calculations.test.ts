@@ -17,39 +17,46 @@ import type { FocusSession } from '../types';
 // ── formatDuration ────────────────────────────────────────────
 
 describe('formatDuration', () => {
-  it('formats zero seconds', () => {
-    expect(formatDuration(0)).toBe('0m');
+  it('formats under 60 seconds with seconds precision (e.g. 1s, 42s, 59s)', () => {
+    expect(formatDuration(0)).toBe('0s');
+    expect(formatDuration(1)).toBe('1s');
+    expect(formatDuration(42)).toBe('42s');
+    expect(formatDuration(59)).toBe('59s');
   });
 
-  it('formats minutes only', () => {
+  it('formats 60 seconds to under 1 hour in minutes (1m to 59m)', () => {
+    expect(formatDuration(60)).toBe('1m'); // 1 minute is never displayed as 0m
     expect(formatDuration(300)).toBe('5m');
+    expect(formatDuration(42 * 60)).toBe('42m');
+    expect(formatDuration(59 * 60)).toBe('59m'); // 59 minutes
     expect(formatDuration(59 * 60 + 30)).toBe('59m');
+    expect(formatDuration(3599)).toBe('59m');
   });
 
-  it('formats hours only', () => {
-    expect(formatDuration(3600)).toBe('1h');
-    expect(formatDuration(7200)).toBe('2h');
-  });
-
-  it('formats hours and minutes', () => {
-    expect(formatDuration(3660)).toBe('1h 1m');
+  it('formats 1 hour (60 minutes) and above with padded 2-digit minutes (1h 00m, 1h 01m, 1h 04m)', () => {
+    expect(formatDuration(3600)).toBe('1h 00m'); // 60 minutes
+    expect(formatDuration(3660)).toBe('1h 01m'); // 1h 1m
+    expect(formatDuration(3840)).toBe('1h 04m'); // 1h 4m
     expect(formatDuration(5400)).toBe('1h 30m');
+    expect(formatDuration(7200)).toBe('2h 00m');
+    expect(formatDuration(7320)).toBe('2h 02m');
+    expect(formatDuration(7920)).toBe('2h 12m');
   });
 
-  it('handles negative input', () => {
-    expect(formatDuration(-100)).toBe('0m');
+  it('handles negative or zero input gracefully', () => {
+    expect(formatDuration(-100)).toBe('0s');
   });
 });
 
 // ── formatHoursMinutes ────────────────────────────────────────
 
 describe('formatHoursMinutes', () => {
-  it('formats zero', () => {
-    expect(formatHoursMinutes(0)).toBe('0m');
-  });
-
-  it('includes 0m for round hours', () => {
-    expect(formatHoursMinutes(3600)).toBe('1h 0m');
+  it('delegates to canonical formatDuration', () => {
+    expect(formatHoursMinutes(0)).toBe('0s');
+    expect(formatHoursMinutes(45)).toBe('45s');
+    expect(formatHoursMinutes(300)).toBe('5m');
+    expect(formatHoursMinutes(3600)).toBe('1h 00m');
+    expect(formatHoursMinutes(3840)).toBe('1h 04m');
   });
 });
 

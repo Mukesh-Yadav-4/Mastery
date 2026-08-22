@@ -17,6 +17,38 @@ export const MILESTONE_ICONS: Record<number, string> = {
   100: '👑',
 };
 
+// ── XP & Level System ─────────────────────────────────────────
+
+/** Exact cumulative XP thresholds for Levels 1–15 */
+export const LEVEL_XP_THRESHOLDS: Record<number, number> = {
+  1: 0,
+  2: 30,
+  3: 75,
+  4: 150,
+  5: 250,
+  6: 375,
+  7: 525,
+  8: 700,
+  9: 900,
+  10: 1150,
+  11: 1350,
+  12: 1575,
+  13: 1825,
+  14: 2100,
+  15: 2500,
+};
+
+/** Completion bonus tiers for completed sessions */
+export const SESSION_COMPLETION_BONUS_TIERS = [
+  { minMinutes: 120, bonusXP: 15 },
+  { minMinutes: 90, bonusXP: 12 },
+  { minMinutes: 60, bonusXP: 8 },
+  { minMinutes: 45, bonusXP: 6 },
+  { minMinutes: 30, bonusXP: 4 },
+  { minMinutes: 15, bonusXP: 2 },
+  { minMinutes: 10, bonusXP: 0 },
+] as const;
+
 // ── Skill Colors ──────────────────────────────────────────────
 export const SKILL_COLORS = [
   '#818cf8', // Indigo

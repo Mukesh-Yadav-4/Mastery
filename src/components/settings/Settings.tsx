@@ -1,19 +1,19 @@
 import { useAuth } from '../../context/AuthContext';
 import { useApp } from '../../context/AppContext';
 import { Button } from '../ui/Button';
-import { LogOut, Flame } from 'lucide-react';
+import { LogOut, Flame, Zap } from 'lucide-react';
 import { formatDuration } from '../../utils/calculations';
 
 export function Settings() {
   const { user, signOut } = useAuth();
-  const { totalHours, streak, sessions, skills } = useApp();
+  const { totalSeconds, streak, sessions, skills, totalXP, globalLevelInfo } = useApp();
 
   return (
-    <div className="animate-fade-in">
-      <h1 className="text-lg font-semibold text-zinc-100 mb-6">Profile</h1>
+    <div className="animate-fade-in space-y-6">
+      <h1 className="text-lg font-semibold text-zinc-100">Profile & Journey</h1>
 
       {/* User info */}
-      <div className="rounded-card bg-surface border border-edge/30 p-5 mb-6">
+      <div className="rounded-card bg-surface border border-edge/30 p-5">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center text-lg">
             ⚡
@@ -48,15 +48,25 @@ export function Settings() {
       {/* Stats overview */}
       <div className="rounded-card bg-surface border border-edge/30 p-5">
         <h2 className="text-sm font-medium text-zinc-400 mb-4">
-          Your journey
+          Your Progression
         </h2>
 
         <div className="space-y-3">
-          <StatRow label="Total practice" value={`${totalHours} hours`} />
-          <StatRow label="Sessions completed" value={`${sessions.length}`} />
-          <StatRow label="Skills active" value={`${skills.length}`} />
           <StatRow
-            label="Current streak"
+            label="Mastery Level"
+            value={
+              <span className="flex items-center gap-1 text-accent font-bold">
+                <Zap size={14} />
+                Level {globalLevelInfo.level}
+              </span>
+            }
+          />
+          <StatRow label="Total Experience" value={`${totalXP.toLocaleString()} XP`} />
+          <StatRow label="Total Practice" value={formatDuration(totalSeconds)} />
+          <StatRow label="Sessions Completed" value={`${sessions.length}`} />
+          <StatRow label="Active Skills" value={`${skills.length}`} />
+          <StatRow
+            label="Current Streak"
             value={
               streak.currentStreak > 0 ? (
                 <span className="flex items-center gap-1">
@@ -69,7 +79,7 @@ export function Settings() {
             }
           />
           <StatRow
-            label="Longest streak"
+            label="Longest Streak"
             value={
               streak.longestStreak > 0
                 ? `${streak.longestStreak} days`
@@ -78,7 +88,7 @@ export function Settings() {
           />
           {sessions.length > 0 ? (
             <StatRow
-              label="Avg session"
+              label="Average Session"
               value={formatDuration(
                 Math.round(
                   sessions.reduce(
@@ -103,7 +113,7 @@ function StatRow({
   value: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between py-1">
+    <div className="flex items-center justify-between py-1 border-b border-edge/20 last:border-b-0">
       <span className="text-sm text-zinc-500">{label}</span>
       <span className="text-sm font-medium text-zinc-200">{value}</span>
     </div>

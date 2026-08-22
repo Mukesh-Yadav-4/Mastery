@@ -1,7 +1,7 @@
 import { ProgressRing } from '../ui/ProgressRing';
 import { Button } from '../ui/Button';
 import { cn } from '../../lib/utils';
-import { formatHoursMinutes, formatPercentage } from '../../utils/calculations';
+import { formatDuration, formatPercentage } from '../../utils/calculations';
 import { MILESTONE_LABELS } from '../../lib/constants';
 import type { SkillProgress } from '../../types';
 import { Play } from 'lucide-react';
@@ -12,82 +12,80 @@ interface SkillCardProps {
 }
 
 export function SkillCard({ progress, onPractice }: SkillCardProps) {
-  const { skill, totalSeconds, percentage, nextMilestone } = progress;
+  const { skill, totalSeconds, percentage, nextMilestone, skillXP, skillLevel } = progress;
 
   return (
     <div
       className={cn(
-        'group relative rounded-card bg-surface border border-edge/50 p-4',
-        'transition-all duration-250',
-        'hover:border-edge hover:bg-surface/80',
+        'group relative rounded-2xl bg-surface/90 border border-edge/60 p-4 sm:p-5',
+        'transition-all duration-250 hover:border-edge hover:bg-surface hover:shadow-lg hover:shadow-black/20',
       )}
     >
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 sm:gap-5">
         {/* Progress Ring */}
         <ProgressRing
           percentage={percentage}
-          size={72}
-          strokeWidth={6}
+          size={68}
+          strokeWidth={5.5}
           color={skill.color}
         >
-          <span className="text-xs font-semibold text-zinc-300 tabular-nums">
+          <span className="text-xs font-bold text-zinc-200 tabular-nums">
             {formatPercentage(percentage)}
           </span>
         </ProgressRing>
 
-        {/* Info */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-0.5">
+        {/* Info Hierarchy */}
+        <div className="flex-1 min-w-0 space-y-1">
+          {/* Skill Title & Icon */}
+          <div className="flex items-center gap-2">
             <span className="text-base">{skill.icon}</span>
-            <h3 className="text-sm font-semibold text-zinc-100 truncate">
+            <h3 className="text-sm sm:text-base font-bold text-zinc-100 truncate tracking-tight">
               {skill.name}
             </h3>
           </div>
 
-          {/* Hours */}
-          <p className="text-xs text-zinc-400 mb-1.5">
-            <span className="text-zinc-200 font-medium">
-              {formatHoursMinutes(totalSeconds)}
+          {/* Primary Metric: Deliberate Practice Hours Invested */}
+          <p className="text-xs sm:text-sm text-zinc-400">
+            <span className="text-zinc-100 font-semibold tabular-nums">
+              {formatDuration(totalSeconds)}
             </span>
-            {' / '}
-            {skill.targetHours}h
+            <span className="text-zinc-500 font-normal">
+              {' / '}
+              {skill.targetHours}h goal
+            </span>
           </p>
 
-          {/* Next milestone */}
-          {nextMilestone ? (
-            <div className="flex items-center gap-1.5">
-              <div
-                className="h-1 flex-1 rounded-full bg-elevated overflow-hidden max-w-[120px]"
-              >
-                <div
-                  className="h-full rounded-full transition-all duration-500 ease-out"
-                  style={{
-                    width: `${Math.min((percentage / nextMilestone) * 100, 100)}%`,
-                    backgroundColor: skill.color,
-                  }}
-                />
-              </div>
-              <span className="text-[10px] text-zinc-500 whitespace-nowrap">
-                {MILESTONE_LABELS[nextMilestone]}
-              </span>
-            </div>
-          ) : (
-            <span className="text-[10px] text-success font-medium">
-              ✓ Goal complete
+          {/* Secondary Progression: Level & XP */}
+          <div className="flex items-center gap-2 text-[11px] text-zinc-400 pt-0.5">
+            <span className="font-semibold text-zinc-300">
+              Level {skillLevel?.level ?? 1}
             </span>
-          )}
+            <span className="text-zinc-600">•</span>
+            <span className="text-zinc-400 tabular-nums">
+              {(skillXP ?? 0).toLocaleString()} XP
+            </span>
+
+            {nextMilestone && (
+              <>
+                <span className="text-zinc-600">•</span>
+                <span className="text-[10px] text-zinc-500 hidden sm:inline">
+                  Next: {MILESTONE_LABELS[nextMilestone]}
+                </span>
+              </>
+            )}
+          </div>
         </div>
 
-        {/* Practice Button */}
+        {/* Practice CTA */}
         <Button
           variant="secondary"
           size="sm"
           onClick={() => onPractice(skill.id)}
-          className="flex-shrink-0 opacity-60 group-hover:opacity-100 transition-opacity"
+          className="flex-shrink-0 opacity-80 group-hover:opacity-100 group-hover:border-accent/40 transition-all cursor-pointer"
           aria-label={`Practice ${skill.name}`}
         >
-          <Play size={14} />
-          <span className="hidden sm:inline">Practice</span>
+          <Play size={14} className="text-accent" />
+          <span className="hidden sm:inline font-medium">Practice</span>
         </Button>
       </div>
     </div>

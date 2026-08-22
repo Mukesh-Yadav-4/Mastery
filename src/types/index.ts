@@ -39,7 +39,17 @@ export interface MilestoneRecord {
   unlockedAt: string;
 }
 
-// ── Computed Types ────────────────────────────────────────────
+// ── Computed Progression Types ────────────────────────────────
+
+export interface LevelInfo {
+  level: number;
+  currentLevelXP: number; // Cumulative threshold for current level
+  nextLevelXP: number; // Cumulative threshold for next level
+  xpInCurrentLevel: number; // XP earned into current level
+  xpRequiredForNextLevel: number; // Total XP needed between current and next level
+  xpToNextLevel: number; // Remaining XP to level up
+  progressPercentage: number; // 0 to 100
+}
 
 export interface SkillProgress {
   skill: Skill;
@@ -49,6 +59,8 @@ export interface SkillProgress {
   currentMilestone: number; // Last reached: 0, 10, 25, 50, 75, 100
   nextMilestone: number | null; // Next target or null if 100% reached
   unlockedMilestones: number[];
+  skillXP: number;
+  skillLevel: LevelInfo;
 }
 
 export interface StreakData {
@@ -80,7 +92,7 @@ export interface NewSkillData {
   targetHours: number;
 }
 
-// ── Celebration State ─────────────────────────────────────────
+// ── Celebration & Reward State ────────────────────────────────
 
 export interface CelebrationData {
   skillName: string;
@@ -89,4 +101,20 @@ export interface CelebrationData {
   percentage: number;
   totalHours: number;
   targetHours: number;
+}
+
+export interface SessionRewardData {
+  skillName: string;
+  skillIcon: string;
+  skillColor: string;
+  durationSeconds: number;
+  earnedXP: number;
+  baseXP: number;
+  bonusXP: number;
+  previousLevelInfo: LevelInfo;
+  newLevelInfo: LevelInfo;
+  didLevelUp: boolean;
+  previousSkillLevelInfo: LevelInfo;
+  newSkillLevelInfo: LevelInfo;
+  didSkillLevelUp: boolean;
 }
