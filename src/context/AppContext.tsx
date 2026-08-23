@@ -34,6 +34,7 @@ import {
   getSessionXPBreakdown,
 } from '../utils/calculations';
 import { MIN_SESSION_DURATION_SECONDS } from '../lib/constants';
+import { getCorePalette, type CorePalette } from '../utils/palettes';
 
 interface AppContextValue {
   // Data
@@ -47,6 +48,11 @@ interface AppContextValue {
   todaySeconds: number;
   totalXP: number;
   globalLevelInfo: LevelInfo;
+
+  // Core Palette Personalization
+  paletteId: string;
+  corePalette: CorePalette;
+  setPaletteId: (paletteId: string) => void;
 
   // Views
   activeView: ActiveView;
@@ -86,6 +92,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [activeTimer, setActiveTimer] = useState<TimerState | null>(null);
   const [celebration, setCelebration] = useState<CelebrationData | null>(null);
   const [sessionReward, setSessionReward] = useState<SessionRewardData | null>(null);
+  const [paletteId, setPaletteIdState] = useState<string>(() => {
+    return db.getStoredPalette(user?.id);
+  });
+
+  const corePalette = useMemo(() => getCorePalette(paletteId), [paletteId]);
+
+  const handleSetPaletteId = useCallback(
+    (newPaletteId: string) => {
+      setPaletteIdState(newPaletteId);
+      db.setStoredPalette(newPaletteId, user?.id);
+    },
+    [user?.id],
+  );
+
+  // Sync palette preference when user changes
+  useEffect(() => {
+    setPaletteIdState(db.getStoredPalette(user?.id));
+  }, [user?.id]);
 
   // Load data when user changes
   const loadData = useCallback(() => {
@@ -359,6 +383,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         todaySeconds,
         totalXP,
         globalLevelInfo,
+        paletteId,
+        corePalette,
+        setPaletteId: handleSetPaletteId,
         activeView,
         setActiveView,
         activeTimer,

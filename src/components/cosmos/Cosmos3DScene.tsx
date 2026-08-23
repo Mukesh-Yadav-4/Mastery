@@ -6,6 +6,7 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import type { SkillProgressionState } from '../../utils/progression';
 import { calculateLevelAura } from '../../utils/progression';
+import { type CorePalette, getCorePalette } from '../../utils/palettes';
 import { cn } from '../../lib/utils';
 
 export interface SceneNodeData {
@@ -27,6 +28,7 @@ interface Cosmos3DSceneProps {
   selectedNodeId?: string;
   onSelectNode: (node: SceneNodeData) => void;
   globalLevel?: number;
+  palette?: CorePalette;
   className?: string;
 }
 
@@ -78,6 +80,7 @@ export function Cosmos3DScene({
   selectedNodeId,
   onSelectNode,
   globalLevel = 1,
+  palette,
   className,
 }: Cosmos3DSceneProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -94,14 +97,23 @@ export function Cosmos3DScene({
     onSelectNodeRef.current = onSelectNode;
   }, [onSelectNode]);
 
+  // Active Core Palette Ref for smooth in-loop color lerping (300-500ms)
+  const activePalette = palette ?? getCorePalette();
+  const paletteRef = useRef<CorePalette>(activePalette);
+  useEffect(() => {
+    paletteRef.current = activePalette;
+  }, [activePalette]);
+
   // Mouse & render loop references
   const mousePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const targetMouseRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const hoveredNodeIdRef = useRef<string | null>(null);
+  const baseCameraZRef = useRef<number>(14.5);
 
   const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (!mountRef.current) return;
     const rect = mountRef.current.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
     const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     const y = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
     targetMouseRef.current = { x, y };
@@ -111,26 +123,37 @@ export function Cosmos3DScene({
     const container = mountRef.current;
     if (!container) return;
 
-    const width = container.clientWidth || 800;
-    const height = container.clientHeight || 600;
+    // Initial container measurements (fallback to standard aspect ratio if hidden during initial tick)
+    const initialWidth = container.clientWidth || 800;
+    const initialHeight = container.clientHeight || 600;
+
+    const initialPal = paletteRef.current;
 
     // ── 1. Scene, Camera & Renderer Setup ───────────────────────
     const scene = new THREE.Scene();
     scene.fog = new THREE.FogExp2(0x060813, 0.016);
 
-    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
-    camera.position.set(0, 0, 14.5);
+    const initialAspect = initialWidth / initialHeight;
+    const camera = new THREE.PerspectiveCamera(45, initialAspect, 0.1, 100);
+
+    // Initial camera distance based on aspect ratio
+    const initialBaseZ = initialAspect < 1.35 ? 14.5 * (1.35 / Math.max(0.65, initialAspect)) : 14.5;
+    baseCameraZRef.current = initialBaseZ;
+    camera.position.set(0, 0, initialBaseZ);
 
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
       alpha: true,
       powerPreference: 'high-performance',
     });
-    renderer.setSize(width, height);
+    renderer.setSize(initialWidth, initialHeight, false);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.35;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.domElement.style.width = '100%';
+    renderer.domElement.style.height = '100%';
+    renderer.domElement.style.display = 'block';
 
     container.appendChild(renderer.domElement);
 
@@ -139,7 +162,7 @@ export function Cosmos3DScene({
     composer.addPass(new RenderPass(scene, camera));
 
     const bloomPass = new UnrealBloomPass(
-      new THREE.Vector2(width, height),
+      new THREE.Vector2(initialWidth, initialHeight),
       0.85,  // strength
       0.65,  // radius
       0.75,  // threshold
@@ -265,7 +288,7 @@ export function Cosmos3DScene({
     planetRing.rotation.y = Math.PI / 8;
     distantPlanetGroup.add(planetRing);
 
-    // ── 5. Centerpiece — Mastery Core ────────────────────────────
+    // ── 5. Centerpiece — Mastery Core with Personal Palette ──────
     const coreGroup = new THREE.Group();
     scene.add(coreGroup);
 
@@ -274,11 +297,11 @@ export function Cosmos3DScene({
     const coreScale = Math.min(1.0, 0.60 + Math.log2(safeGlobalLevel) * 0.08);
     coreGroup.scale.set(coreScale, coreScale, coreScale);
 
-    // Inner Core
+    // Inner Core (Personalized)
     const innerGeo = new THREE.SphereGeometry(0.92, 48, 48);
     const innerMat = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(0x818cf8),
-      emissive: new THREE.Color(0x6366f1),
+      color: new THREE.Color(initialPal.coreInner),
+      emissive: new THREE.Color(initialPal.corePrimary),
       emissiveIntensity: 2.8,
       roughness: 0.15,
       metalness: 0.7,
@@ -286,10 +309,10 @@ export function Cosmos3DScene({
     const innerCore = new THREE.Mesh(innerGeo, innerMat);
     coreGroup.add(innerCore);
 
-    // Outer Crystal Shell
+    // Outer Crystal Shell (Personalized Refraction)
     const crystalGeo = new THREE.SphereGeometry(1.62, 64, 64);
     const crystalMat = new THREE.MeshPhysicalMaterial({
-      color: new THREE.Color(0xc7d2fe),
+      color: new THREE.Color(initialPal.coreSecondary),
       transparent: true,
       opacity: 0.6,
       transmission: 0.82,
@@ -300,7 +323,7 @@ export function Cosmos3DScene({
       clearcoatRoughness: 0.08,
       specularIntensity: 1.0,
       specularColor: new THREE.Color(0xffffff),
-      attenuationColor: new THREE.Color(0x818cf8),
+      attenuationColor: new THREE.Color(initialPal.corePrimary),
       attenuationDistance: 2.0,
     });
     const crystalShell = new THREE.Mesh(crystalGeo, crystalMat);
@@ -309,7 +332,7 @@ export function Cosmos3DScene({
     // Geodesic Accent Lattice
     const latticeGeo = new THREE.IcosahedronGeometry(1.68, 1);
     const latticeMat = new THREE.MeshBasicMaterial({
-      color: new THREE.Color(0x22d3ee),
+      color: new THREE.Color(initialPal.accent),
       wireframe: true,
       transparent: true,
       opacity: 0.2,
@@ -317,17 +340,17 @@ export function Cosmos3DScene({
     const latticeShell = new THREE.Mesh(latticeGeo, latticeMat);
     coreGroup.add(latticeShell);
 
-    // Core Point Lights (Scaled to Core Size)
-    const coreLight1 = new THREE.PointLight(0x818cf8, 4.5 * coreScale, 22 * coreScale, 1.2);
+    // Core Point Lights (Scaled to Core Size & Palette)
+    const coreLight1 = new THREE.PointLight(new THREE.Color(initialPal.aura), 4.5 * coreScale, 22 * coreScale, 1.2);
     coreGroup.add(coreLight1);
-    const coreLight2 = new THREE.PointLight(0x22d3ee, 3.0 * coreScale, 15 * coreScale, 1.4);
+    const coreLight2 = new THREE.PointLight(new THREE.Color(initialPal.accent), 3.0 * coreScale, 15 * coreScale, 1.4);
     coreGroup.add(coreLight2);
 
     // 3D Concentric Metallic Orbital Rings
     const ring1Geo = new THREE.TorusGeometry(2.5, 0.022, 24, 120);
     const ring1Mat = new THREE.MeshStandardMaterial({
-      color: 0x818cf8,
-      emissive: 0x818cf8,
+      color: new THREE.Color(initialPal.ring1),
+      emissive: new THREE.Color(initialPal.ring1),
       emissiveIntensity: 1.3,
       metalness: 0.95,
       roughness: 0.08,
@@ -339,8 +362,8 @@ export function Cosmos3DScene({
 
     const ring2Geo = new THREE.TorusGeometry(3.3, 0.018, 24, 120);
     const ring2Mat = new THREE.MeshStandardMaterial({
-      color: 0x22d3ee,
-      emissive: 0x22d3ee,
+      color: new THREE.Color(initialPal.ring2),
+      emissive: new THREE.Color(initialPal.ring2),
       emissiveIntensity: 1.1,
       metalness: 0.95,
       roughness: 0.08,
@@ -352,8 +375,8 @@ export function Cosmos3DScene({
 
     const ring3Geo = new THREE.TorusGeometry(4.2, 0.014, 24, 120);
     const ring3Mat = new THREE.MeshStandardMaterial({
-      color: 0xf472b6,
-      emissive: 0xf472b6,
+      color: new THREE.Color(initialPal.ring3),
+      emissive: new THREE.Color(initialPal.ring3),
       emissiveIntensity: 0.8,
       metalness: 0.95,
       roughness: 0.08,
@@ -537,7 +560,7 @@ export function Cosmos3DScene({
       const coreTubeMesh = new THREE.Mesh(coreTubeGeo, coreTubeMat);
       scene.add(coreTubeMesh);
 
-      // B. Outer Glowing Energy Stream Tube
+      // B. Outer Glowing Energy Stream Tube (Blends Skill Color with Core Palette)
       const glowTubeGeo = new THREE.TubeGeometry(curve, 48, 0.032, 8, false);
       const glowTubeMat = new THREE.MeshStandardMaterial({
         color: colorVal,
@@ -573,7 +596,7 @@ export function Cosmos3DScene({
       // D. Network Pulse Surge Bead
       const pulseGeo = new THREE.SphereGeometry(0.15, 14, 14);
       const pulseMat = new THREE.MeshBasicMaterial({
-        color: 0xffffff,
+        color: new THREE.Color(initialPal.pulse),
         transparent: true,
         opacity: 0,
       });
@@ -605,6 +628,7 @@ export function Cosmos3DScene({
 
     const handleCanvasClick = (e: MouseEvent) => {
       const rect = renderer.domElement.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
       mouseVector.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       mouseVector.y = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
 
@@ -626,20 +650,39 @@ export function Cosmos3DScene({
 
     renderer.domElement.addEventListener('click', handleCanvasClick);
 
-    // ── 8. Resize Observer ───────────────────────────────────────
-    const handleResize = () => {
-      if (!container) return;
-      const w = container.clientWidth;
-      const h = container.clientHeight;
-      if (w === 0 || h === 0) return;
+    // ── 8. Robust Container-Based ResizeObserver ─────────────────
+    const handleContainerResize = (w: number, h: number) => {
+      if (w <= 0 || h <= 0) return;
 
-      camera.aspect = w / h;
+      const aspect = w / h;
+      camera.aspect = aspect;
+
+      // Responsive Camera Framing: Adapt camera Z distance on narrow aspect ratios
+      // so all skill nodes (at x = +-4.5) remain in viewport with proper margin
+      const adaptedBaseZ = aspect < 1.35 ? 14.5 * (1.35 / Math.max(0.65, aspect)) : 14.5;
+      baseCameraZRef.current = adaptedBaseZ;
+
       camera.updateProjectionMatrix();
-      renderer.setSize(w, h);
+      renderer.setSize(w, h, false);
       composer.setSize(w, h);
+      bloomPass.setSize(w, h);
     };
 
-    window.addEventListener('resize', handleResize);
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0) {
+          handleContainerResize(width, height);
+        }
+      }
+    });
+
+    resizeObserver.observe(container);
+
+    // Initial pass to ensure exact sizing even if container layout was pending
+    if (container.clientWidth > 0 && container.clientHeight > 0) {
+      handleContainerResize(container.clientWidth, container.clientHeight);
+    }
 
     // ── 9. Living Cosmos Render Animation Loop ───────────────────
     const clock = new THREE.Clock();
@@ -648,7 +691,32 @@ export function Cosmos3DScene({
     const animate = () => {
       const elapsedTime = clock.getElapsedTime();
 
-      // Damped Camera Parallax with Gentle Idle Orbit
+      // ── Core Palette Smooth Crossfade (300-500ms Lerp) ─────────
+      const currentPal = paletteRef.current;
+      const targetInner = new THREE.Color(currentPal.coreInner);
+      const targetPrimary = new THREE.Color(currentPal.corePrimary);
+      const targetSecondary = new THREE.Color(currentPal.coreSecondary);
+      const targetAura = new THREE.Color(currentPal.aura);
+      const targetAccent = new THREE.Color(currentPal.accent);
+      const targetRing1 = new THREE.Color(currentPal.ring1);
+      const targetRing2 = new THREE.Color(currentPal.ring2);
+      const targetRing3 = new THREE.Color(currentPal.ring3);
+
+      innerMat.color.lerp(targetInner, 0.08);
+      innerMat.emissive.lerp(targetPrimary, 0.08);
+      crystalMat.color.lerp(targetSecondary, 0.08);
+      crystalMat.attenuationColor.lerp(targetPrimary, 0.08);
+      latticeMat.color.lerp(targetAccent, 0.08);
+      ring1Mat.color.lerp(targetRing1, 0.08);
+      ring1Mat.emissive.lerp(targetRing1, 0.08);
+      ring2Mat.color.lerp(targetRing2, 0.08);
+      ring2Mat.emissive.lerp(targetRing2, 0.08);
+      ring3Mat.color.lerp(targetRing3, 0.08);
+      ring3Mat.emissive.lerp(targetRing3, 0.08);
+      coreLight1.color.lerp(targetAura, 0.08);
+      coreLight2.color.lerp(targetAccent, 0.08);
+
+      // Damped Camera Parallax with Gentle Idle Orbit & Adaptive Z Distance
       mousePosRef.current.x += (targetMouseRef.current.x - mousePosRef.current.x) * 0.04;
       mousePosRef.current.y += (targetMouseRef.current.y - mousePosRef.current.y) * 0.04;
 
@@ -657,6 +725,7 @@ export function Cosmos3DScene({
 
       camera.position.x = mousePosRef.current.x * 1.6 + idleCamX;
       camera.position.y = mousePosRef.current.y * 1.0 + idleCamY;
+      camera.position.z = baseCameraZRef.current;
       camera.lookAt(0, 0, 0);
 
       // ── Mastery Core Evident Multi-Speed Dynamics ───────────────
@@ -695,6 +764,9 @@ export function Cosmos3DScene({
       const activePulseCycle = 7.0; // 7s pulse period
       const pulseIndex = Math.floor(elapsedTime / activePulseCycle) % Math.max(1, curveStreams.length);
       const pulseProgress = (elapsedTime % activePulseCycle) / 1.8; // 1.8s travel duration
+
+      const liveWidth = container.clientWidth || 800;
+      const liveHeight = container.clientHeight || 600;
 
       curveStreams.forEach((stream, idx) => {
         const group = nodeMeshes.get(stream.targetNodeId);
@@ -758,15 +830,15 @@ export function Cosmos3DScene({
           }
         });
 
-        // ── E. Direct DOM Transform Update (0 React Re-Renders!) ────
+        // ── E. Direct DOM Transform Update (Synced to Live Container) ────
         const labelEl = labelElsRef.current.get(stream.targetNodeId);
         if (labelEl) {
           const worldPos = new THREE.Vector3();
           group.getWorldPosition(worldPos);
           const proj = worldPos.clone().project(camera);
 
-          const screenX = ((proj.x + 1) * container.clientWidth) / 2;
-          const screenY = ((-proj.y + 1) * container.clientHeight) / 2;
+          const screenX = ((proj.x + 1) * liveWidth) / 2;
+          const screenY = ((-proj.y + 1) * liveHeight) / 2;
           const depthFactor = THREE.MathUtils.clamp((worldPos.z + 4) / 8, 0.78, 1.22);
           const opacity = proj.z < 1 ? THREE.MathUtils.clamp(depthFactor, 0.72, 1) : 0;
 
@@ -784,7 +856,7 @@ export function Cosmos3DScene({
     // ── 10. Complete Cleanup on Unmount ──────────────────────────
     return () => {
       if (animFrameId) cancelAnimationFrame(animFrameId);
-      window.removeEventListener('resize', handleResize);
+      resizeObserver.disconnect();
       renderer.domElement.removeEventListener('click', handleCanvasClick);
       if (renderer.domElement && container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);

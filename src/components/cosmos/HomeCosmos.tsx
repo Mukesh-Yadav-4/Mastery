@@ -15,6 +15,7 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
     streak,
     totalXP,
     globalLevelInfo,
+    corePalette,
     startTimer,
   } = useApp();
 
@@ -95,6 +96,7 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
           totalDurationFormatted={formatDuration(totalSeconds)}
           streakDays={streak.currentStreak}
           selectedNode={selectedNode}
+          palette={corePalette}
           onStartFocus={handleStartFocus}
           onOpenCreateSkill={onOpenCreateSkill}
         />
@@ -131,6 +133,7 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
           selectedNodeId={activeSelectedId}
           onSelectNode={(node) => setSelectedNodeId(node.id)}
           globalLevel={globalLevelInfo.level}
+          palette={corePalette}
           className="w-full h-full"
         />
       </div>

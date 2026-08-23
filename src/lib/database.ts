@@ -320,8 +320,6 @@ export function checkAndCreateMilestones(
   return newMilestones;
 }
 
-// ── Timer Persistence ─────────────────────────────────────────
-
 export function saveTimerState(state: TimerState | null): void {
   if (state) {
     writeJson(STORAGE_KEYS.ACTIVE_TIMER, state);
@@ -333,3 +331,18 @@ export function saveTimerState(state: TimerState | null): void {
 export function getTimerState(): TimerState | null {
   return readJson<TimerState | null>(STORAGE_KEYS.ACTIVE_TIMER, null);
 }
+
+// ── Core Palette Persistence ──────────────────────────────────
+
+export function getStoredPalette(userId?: string): string {
+  const key = userId ? `${STORAGE_KEYS.CORE_PALETTE}_${userId}` : STORAGE_KEYS.CORE_PALETTE;
+  return readJson<string>(key, 'violet');
+}
+
+export function setStoredPalette(paletteId: string, userId?: string): void {
+  const key = userId ? `${STORAGE_KEYS.CORE_PALETTE}_${userId}` : STORAGE_KEYS.CORE_PALETTE;
+  writeJson(key, paletteId);
+  // Also write to global fallback
+  writeJson(STORAGE_KEYS.CORE_PALETTE, paletteId);
+}
+

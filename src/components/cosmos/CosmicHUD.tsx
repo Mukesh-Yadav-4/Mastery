@@ -3,12 +3,15 @@ import type { CosmicNodeData } from './CosmicNode';
 import { Button } from '../ui/Button';
 import { Zap, Clock, Flame, Sparkles, Play, Target, Compass } from 'lucide-react';
 
+import type { CorePalette } from '../../utils/palettes';
+
 interface CosmicHUDProps {
   levelInfo: LevelInfo;
   totalXP: number;
   totalDurationFormatted: string;
   streakDays: number;
   selectedNode: CosmicNodeData | null;
+  palette?: CorePalette;
   onStartFocus: (skillId: string) => void;
   onOpenCreateSkill: () => void;
 }
@@ -19,6 +22,7 @@ export function CosmicHUD({
   totalDurationFormatted,
   streakDays,
   selectedNode,
+  palette,
   onStartFocus,
   onOpenCreateSkill,
 }: CosmicHUDProps) {
@@ -43,6 +47,9 @@ export function CosmicHUD({
   };
 
   const progression = selectedNode?.progression;
+  const accentColor = palette?.hudAccent ?? '#818cf8';
+  const badgeBg = palette?.hudBadgeBg ?? 'rgba(129,140,248,0.15)';
+  const badgeBorder = palette?.hudBorder ?? 'rgba(129,140,248,0.3)';
 
   return (
     <>
@@ -51,8 +58,15 @@ export function CosmicHUD({
         <div className="rounded-2xl bg-surface/85 border border-edge/60 p-3 sm:p-3.5 backdrop-blur-md shadow-xl shadow-black/40 space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-xl bg-accent/20 border border-accent/40 text-accent text-xs shadow-[0_0_10px_rgba(129,140,248,0.4)]">
-                <Zap size={13} className="fill-accent/40" />
+              <div
+                className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-xl border text-xs shadow-[0_0_10px_rgba(129,140,248,0.4)]"
+                style={{
+                  backgroundColor: badgeBg,
+                  borderColor: badgeBorder,
+                  color: accentColor,
+                }}
+              >
+                <Zap size={13} className="fill-current opacity-80" />
               </div>
               <div>
                 <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500 block">
@@ -60,7 +74,10 @@ export function CosmicHUD({
                 </span>
                 <h3 className="text-xs sm:text-sm font-bold text-zinc-100 flex items-center gap-1.5">
                   <span>Level {level}</span>
-                  <span className="text-[10px] sm:text-[11px] font-medium text-accent">
+                  <span
+                    className="text-[10px] sm:text-[11px] font-medium"
+                    style={{ color: accentColor }}
+                  >
                     • {getCosmicTitle(level)}
                   </span>
                 </h3>

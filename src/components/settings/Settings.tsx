@@ -1,12 +1,23 @@
 import { useAuth } from '../../context/AuthContext';
 import { useApp } from '../../context/AppContext';
 import { Button } from '../ui/Button';
-import { LogOut, Flame, Zap } from 'lucide-react';
+import { LogOut, Flame, Zap, Sparkles, Check } from 'lucide-react';
 import { formatDuration } from '../../utils/calculations';
+import { CORE_PALETTES_LIST } from '../../utils/palettes';
+import { cn } from '../../lib/utils';
 
 export function Settings() {
   const { user, signOut } = useAuth();
-  const { totalSeconds, streak, sessions, skills, totalXP, globalLevelInfo } = useApp();
+  const {
+    totalSeconds,
+    streak,
+    sessions,
+    skills,
+    totalXP,
+    globalLevelInfo,
+    paletteId,
+    setPaletteId,
+  } = useApp();
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -43,6 +54,70 @@ export function Settings() {
           <LogOut size={14} />
           Sign out
         </Button>
+      </div>
+
+      {/* ── CORE IDENTITY Palette Personalization ────────────── */}
+      <div className="rounded-card bg-surface border border-edge/30 p-5 space-y-4">
+        <div>
+          <h2 className="text-xs font-bold uppercase tracking-wider text-accent flex items-center gap-2">
+            <Sparkles size={14} />
+            <span>Core Identity</span>
+          </h2>
+          <p className="text-xs text-zinc-400 mt-1">
+            Choose the energy of your universe.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {CORE_PALETTES_LIST.map((p) => {
+            const isSelected = paletteId === p.id;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setPaletteId(p.id)}
+                className={cn(
+                  'relative text-left p-3.5 rounded-2xl border transition-all duration-300 flex items-start gap-3 cursor-pointer group',
+                  isSelected
+                    ? 'bg-surface-elevated/80 border-accent/80 shadow-lg ring-1 ring-accent/40'
+                    : 'bg-canvas/50 border-edge/40 hover:border-zinc-500 hover:bg-surface-elevated/40',
+                )}
+                aria-pressed={isSelected}
+              >
+                {/* Visual Orb Preview */}
+                <div
+                  className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center border border-white/20 shadow-md relative overflow-hidden transition-transform duration-300 group-hover:scale-105"
+                  style={{
+                    background: `linear-gradient(135deg, ${p.coreInner}, ${p.corePrimary}, ${p.coreSecondary})`,
+                    boxShadow: isSelected ? `0 0 16px ${p.aura}80` : undefined,
+                  }}
+                >
+                  <div className="w-3.5 h-3.5 rounded-full bg-white/90 blur-[1px] shadow-sm" />
+                </div>
+
+                {/* Details */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-1">
+                    <div className="flex items-center gap-1.5 truncate">
+                      <span className="text-xs font-bold text-zinc-100">
+                        {p.name}
+                      </span>
+                      <span className="text-[10px] font-semibold text-accent/90">
+                        — {p.themeName}
+                      </span>
+                    </div>
+                    {isSelected && (
+                      <Check size={14} className="text-accent flex-shrink-0" />
+                    )}
+                  </div>
+                  <p className="text-[11px] text-zinc-400 mt-0.5 leading-snug">
+                    {p.description}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Stats overview */}

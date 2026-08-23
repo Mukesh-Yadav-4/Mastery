@@ -93,7 +93,7 @@ export function AppShell({
       {/* Main Content */}
       <main
         className={cn(
-          'flex-1 w-full mx-auto px-4 md:px-6 py-6 pb-20 md:pb-6 transition-all duration-300',
+          'flex-1 w-full mx-auto px-4 md:px-6 py-6 pb-20 md:pb-6',
           activeView === 'dashboard' ? 'max-w-5xl' : 'max-w-2xl',
         )}
       >

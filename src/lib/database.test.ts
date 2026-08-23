@@ -13,6 +13,8 @@ import {
   getMilestones,
   saveTimerState,
   getTimerState,
+  getStoredPalette,
+  setStoredPalette,
 } from '../lib/database';
 import { STORAGE_KEYS } from '../lib/constants';
 import type { TimerState } from '../types';
@@ -298,5 +300,26 @@ describe('Timer State', () => {
 
   it('returns null when no timer saved', () => {
     expect(getTimerState()).toBeNull();
+  });
+});
+
+// ── Core Palette Persistence ──────────────────────────────────
+
+describe('Core Palette Persistence', () => {
+  it('defaults to violet if no palette stored', () => {
+    expect(getStoredPalette()).toBe('violet');
+    expect(getStoredPalette('user-123')).toBe('violet');
+  });
+
+  it('persists and retrieves chosen palette', () => {
+    setStoredPalette('azure');
+    expect(getStoredPalette()).toBe('azure');
+  });
+
+  it('persists and retrieves user-specific palette', () => {
+    setStoredPalette('emerald', 'user-456');
+    expect(getStoredPalette('user-456')).toBe('emerald');
+    // Global fallback also updated
+    expect(getStoredPalette()).toBe('emerald');
   });
 });

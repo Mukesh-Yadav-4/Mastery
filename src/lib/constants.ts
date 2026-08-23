@@ -85,4 +85,5 @@ export const STORAGE_KEYS = {
   SESSIONS: 'mastery_sessions',
   MILESTONES: 'mastery_milestones',
   ACTIVE_TIMER: 'mastery_active_timer',
+  CORE_PALETTE: 'mastery_core_palette',
 } as const;
