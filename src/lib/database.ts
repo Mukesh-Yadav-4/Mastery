@@ -96,7 +96,61 @@ export function signIn(email: string, password: string): User {
     createdAt: user.createdAt,
   };
   writeJson(STORAGE_KEYS.CURRENT_USER, publicUser);
+  return publicUser;
+}
 
+export function resetPassword(email: string, newPassword: string): User {
+  const trimmedEmail = email.trim().toLowerCase();
+  if (newPassword.length < 6) {
+    throw new Error('Password must be at least 6 characters');
+  }
+
+  const users = readJson<StoredUser[]>(STORAGE_KEYS.USERS, []);
+  let user = users.find((u) => u.email === trimmedEmail);
+
+  if (user) {
+    user.password = newPassword;
+  } else {
+    user = {
+      id: generateId(),
+      email: trimmedEmail,
+      password: newPassword,
+      createdAt: new Date().toISOString(),
+    };
+    users.push(user);
+  }
+
+  writeJson(STORAGE_KEYS.USERS, users);
+
+  const publicUser: User = {
+    id: user.id,
+    email: user.email,
+    createdAt: user.createdAt,
+  };
+  writeJson(STORAGE_KEYS.CURRENT_USER, publicUser);
+  return publicUser;
+}
+
+export function demoSignIn(): User {
+  const users = readJson<StoredUser[]>(STORAGE_KEYS.USERS, []);
+  let user = users.find((u) => u.email === 'demo@mastery.app');
+  if (!user) {
+    user = {
+      id: generateId(),
+      email: 'demo@mastery.app',
+      password: 'password123',
+      createdAt: new Date().toISOString(),
+    };
+    users.push(user);
+    writeJson(STORAGE_KEYS.USERS, users);
+  }
+
+  const publicUser: User = {
+    id: user.id,
+    email: user.email,
+    createdAt: user.createdAt,
+  };
+  writeJson(STORAGE_KEYS.CURRENT_USER, publicUser);
   return publicUser;
 }
 

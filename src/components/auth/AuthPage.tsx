@@ -10,7 +10,7 @@ interface AuthPageProps {
 }
 
 export function AuthPage({ initialMode = 'signin', onNavigateHome }: AuthPageProps) {
-  const { signIn, signUp, error, clearError, loading } = useAuth();
+  const { signIn, signUp, resetPassword, demoSignIn, error, clearError, loading } = useAuth();
   const [mode, setMode] = useState<'signin' | 'signup'>(initialMode);
   const [prevInitialMode, setPrevInitialMode] = useState(initialMode);
   const [email, setEmail] = useState('');
@@ -58,40 +58,39 @@ export function AuthPage({ initialMode = 'signin', onNavigateHome }: AuthPagePro
     <div className="min-h-dvh flex items-center justify-center p-4 bg-canvas relative">
       {/* Background Glow */}
       <div
-        className="pointer-events-none absolute left-1/2 top-1/3 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[300px] bg-accent/10 blur-[100px] rounded-full -z-10"
+        className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_40%,rgba(129,140,248,0.12),rgba(0,0,0,0))] -z-10"
         aria-hidden="true"
       />
 
-      <div className="w-full max-w-sm animate-fade-in relative z-10">
-        {/* Back to Home Button */}
+      <div className="w-full max-w-sm rounded-2xl bg-surface border border-edge p-6 sm:p-8 shadow-xl">
         {onNavigateHome && (
           <button
             type="button"
             onClick={onNavigateHome}
-            className="inline-flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-100 transition-colors mb-6 cursor-pointer"
+            className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors mb-6 cursor-pointer"
           >
             <ArrowLeft size={14} />
             <span>Back to home</span>
           </button>
         )}
 
-        {/* Brand */}
-        <div className="text-center mb-8">
-          <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-accent/15 border border-accent/30 text-accent font-bold text-lg mb-3">
-            ⚡
+        {/* Brand Icon & Heading */}
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-accent/15 border border-accent/30 text-accent mb-3 shadow-inner">
+            <span className="text-lg">⚡</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-50 mb-1.5">
-            {mode === 'signin' ? 'Welcome back' : 'Start your journey'}
+          <h1 className="text-xl font-bold text-zinc-100 tracking-tight">
+            {mode === 'signin' ? 'Welcome back' : 'Create your account'}
           </h1>
-          <p className="text-xs sm:text-sm text-zinc-400">
+          <p className="text-xs text-zinc-400 mt-1">
             {mode === 'signin'
               ? 'Continue making your practice measurable.'
-              : 'Create an account to track your deliberate practice.'}
+              : 'Begin tracking your deliberate practice hours.'}
           </p>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-edge/60 bg-surface/80 p-6 shadow-xl backdrop-blur-md">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <Input
             label="Email"
             type="email"
@@ -123,9 +122,18 @@ export function AuthPage({ initialMode = 'signin', onNavigateHome }: AuthPagePro
           ) : null}
 
           {displayError ? (
-            <p className="text-xs text-danger text-center py-1 animate-fade-in font-medium">
-              {displayError}
-            </p>
+            <div className="space-y-2 py-1 animate-fade-in text-center">
+              <p className="text-xs text-danger font-medium">{displayError}</p>
+              {mode === 'signin' && email.includes('@') && password.length >= 6 && (
+                <button
+                  type="button"
+                  onClick={() => resetPassword(email, password)}
+                  className="text-xs text-accent hover:underline font-semibold block mx-auto cursor-pointer"
+                >
+                  🔑 Set password & Sign in as {email}
+                </button>
+              )}
+            </div>
           ) : null}
 
           <Button
@@ -133,9 +141,27 @@ export function AuthPage({ initialMode = 'signin', onNavigateHome }: AuthPagePro
             variant="primary"
             size="lg"
             loading={loading}
-            className="w-full mt-2 font-semibold shadow-md shadow-accent/20"
+            className="w-full mt-2 font-semibold shadow-md shadow-accent/20 cursor-pointer"
           >
             {mode === 'signin' ? 'Sign in' : 'Create account'}
+          </Button>
+
+          {/* 1-Click Quick Enter for Instant Access */}
+          <div className="relative flex items-center justify-center my-4">
+            <div className="border-t border-edge/60 w-full" />
+            <span className="bg-surface px-2 text-[10px] text-zinc-500 uppercase tracking-widest absolute">
+              or
+            </span>
+          </div>
+
+          <Button
+            type="button"
+            variant="secondary"
+            size="md"
+            onClick={demoSignIn}
+            className="w-full font-semibold text-xs text-zinc-200 hover:text-white border-edge/60 hover:border-accent/60 shadow-sm cursor-pointer transition-all"
+          >
+            ⚡ Instant 1-Click Demo Access
           </Button>
         </form>
 

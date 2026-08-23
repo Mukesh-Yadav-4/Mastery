@@ -91,7 +91,12 @@ export function AppShell({
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 w-full max-w-2xl mx-auto px-4 md:px-6 py-6 pb-20 md:pb-6">
+      <main
+        className={cn(
+          'flex-1 w-full mx-auto px-4 md:px-6 py-6 pb-20 md:pb-6 transition-all duration-300',
+          activeView === 'dashboard' ? 'max-w-5xl' : 'max-w-2xl',
+        )}
+      >
         {children}
       </main>
 

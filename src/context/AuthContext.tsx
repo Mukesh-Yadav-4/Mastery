@@ -15,6 +15,8 @@ interface AuthContextValue {
   error: string | null;
   signUp: (email: string, password: string) => void;
   signIn: (email: string, password: string) => void;
+  resetPassword: (email: string, password: string) => void;
+  demoSignIn: () => void;
   signOut: () => void;
   clearError: () => void;
 }
@@ -53,6 +55,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const handleDemoSignIn = useCallback(() => {
+    setError(null);
+    try {
+      const demoUser = db.demoSignIn();
+      setUser(demoUser);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Demo sign in failed');
+    }
+  }, []);
+
+  const handleResetPassword = useCallback((email: string, password: string) => {
+    setError(null);
+    try {
+      const updatedUser = db.resetPassword(email, password);
+      setUser(updatedUser);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Password reset failed');
+    }
+  }, []);
+
   const handleSignOut = useCallback(() => {
     db.signOut();
     setUser(null);
@@ -71,6 +93,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         error,
         signUp: handleSignUp,
         signIn: handleSignIn,
+        resetPassword: handleResetPassword,
+        demoSignIn: handleDemoSignIn,
         signOut: handleSignOut,
         clearError,
       }}

@@ -81,7 +81,7 @@ describe('Full Mastery V0.1 User Journey', () => {
     expect(initialProgress.skillLevel.level).toBe(1);
 
     // 3. START SESSION
-    const startTime = Date.now() - 3600000 * 10; // 10 hours ago
+    const startTime = Date.now() - 60000; // 1 min ago
     const timerState: TimerState = {
       skillId: skill.id,
       startedAt: startTime,
@@ -202,7 +202,7 @@ describe('Full Mastery V0.1 User Journey', () => {
     createSession(
       user.id,
       skill.id,
-      Date.now() - 3600000 * 15,
+      Date.now() - 30000,
       Date.now(),
       15 * 3600, // 15 hours = 900 min -> 900 base + 15 bonus = 915 XP
     );
