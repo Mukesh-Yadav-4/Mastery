@@ -340,8 +340,12 @@ export function Cosmos3DScene({
     const state = orbitStateRef.current;
     state.targetOrbitAngleX = 0;
     state.targetOrbitAngleY = 0;
+    state.orbitAngleX = 0;
+    state.orbitAngleY = 0;
     state.targetZoomDistance = baseCameraZRef.current;
+    state.zoomDistance = baseCameraZRef.current;
     state.targetLookAt.set(0, 0, 0);
+    state.currentLookAt.set(0, 0, 0);
     state.lastInteractionTime = performance.now();
     setHasCustomOrbit(false);
   }, []);
@@ -997,8 +1001,12 @@ export function Cosmos3DScene({
       camera.aspect = aspect;
 
       // Responsive Camera Framing: Adapt camera Z distance on narrow aspect ratios
-      const adaptedBaseZ = aspect < 1.35 ? 14.5 * (1.35 / Math.max(0.65, aspect)) : 14.5;
+      const adaptedBaseZ = aspect < 1.2 ? Math.min(22.0, 14.5 * (1.2 / Math.max(0.45, aspect))) : 14.5;
       baseCameraZRef.current = adaptedBaseZ;
+      if (!orbitStateRef.current.hasMoved) {
+        orbitStateRef.current.zoomDistance = adaptedBaseZ;
+        orbitStateRef.current.targetZoomDistance = adaptedBaseZ;
+      }
 
       camera.updateProjectionMatrix();
       renderer.setSize(w, h, false);
@@ -1172,34 +1180,23 @@ export function Cosmos3DScene({
         0.08,
       );
 
-      // Target lookAt framing: when a skill is selected, smoothly glide camera target to that node
-      if (hasActiveSelection) {
-        const selectedGroup = nodeMeshes.get(selectedId!);
-        if (selectedGroup) {
-          const targetWorld = new THREE.Vector3();
-          selectedGroup.getWorldPosition(targetWorld);
-          oState.targetLookAt.set(
-            targetWorld.x * 0.55,
-            targetWorld.y * 0.55,
-            targetWorld.z * 0.55,
-          );
-        }
-      } else if (isCinematicActive && cState.targetSkillId) {
+      // Target lookAt framing: centered at Core (0,0,0) unless cinematic focus event is running
+      if (isCinematicActive && cState.targetSkillId) {
         const targetGroup = nodeMeshes.get(cState.targetSkillId);
         if (targetGroup) {
           const targetWorld = new THREE.Vector3();
           targetGroup.getWorldPosition(targetWorld);
           oState.targetLookAt.set(
-            targetWorld.x * 0.45,
-            targetWorld.y * 0.45,
-            targetWorld.z * 0.45,
+            targetWorld.x * 0.4,
+            targetWorld.y * 0.4,
+            targetWorld.z * 0.4,
           );
         }
       } else {
         oState.targetLookAt.set(0, 0, 0);
       }
 
-      oState.currentLookAt.lerp(oState.targetLookAt, 0.06);
+      oState.currentLookAt.lerp(oState.targetLookAt, 0.08);
 
       // Spherical coordinate system around currentLookAt
       const cosY = Math.cos(oState.orbitAngleY);
@@ -1207,9 +1204,9 @@ export function Cosmos3DScene({
       const cosX = Math.cos(oState.orbitAngleX);
       const sinX = Math.sin(oState.orbitAngleX);
 
-      // Parallax offset
-      const parallaxX = mousePosRef.current.x * 0.5;
-      const parallaxY = mousePosRef.current.y * 0.35;
+      // Subtle mouse parallax (restrained so Cosmos remains centered)
+      const parallaxX = mousePosRef.current.x * 0.18;
+      const parallaxY = mousePosRef.current.y * 0.12;
 
       camera.position.x =
         oState.currentLookAt.x +
@@ -1475,13 +1472,28 @@ export function Cosmos3DScene({
           group.getWorldPosition(worldPos);
           const proj = worldPos.clone().project(camera);
 
-          const screenX = ((proj.x + 1) * liveWidth) / 2;
-          const screenY = ((-proj.y + 1) * liveHeight) / 2;
-          const depthFactor = THREE.MathUtils.clamp((worldPos.z + 4) / 8, 0.78, 1.22);
-          const opacity = proj.z < 1 ? THREE.MathUtils.clamp(depthFactor, 0.72, 1) : 0;
+          const isVisibleInFrustum =
+            proj.z < 1.0 &&
+            proj.x >= -1.02 &&
+            proj.x <= 1.02 &&
+            proj.y >= -1.02 &&
+            proj.y <= 1.02;
 
-          labelEl.style.transform = `translate3d(${screenX}px, ${screenY}px, 0) translate(-50%, -50%) scale(${depthFactor})`;
-          labelEl.style.opacity = `${opacity}`;
+          if (isVisibleInFrustum) {
+            const screenX = ((proj.x + 1) * liveWidth) / 2;
+            const screenY = ((-proj.y + 1) * liveHeight) / 2;
+            const depthFactor = THREE.MathUtils.clamp((worldPos.z + 4) / 8, 0.78, 1.22);
+            const opacity = THREE.MathUtils.clamp(depthFactor, 0.72, 1);
+
+            labelEl.style.display = 'block';
+            labelEl.style.pointerEvents = 'auto';
+            labelEl.style.transform = `translate3d(${screenX}px, ${screenY}px, 0) translate(-50%, -50%) scale(${depthFactor})`;
+            labelEl.style.opacity = `${opacity}`;
+          } else {
+            labelEl.style.display = 'none';
+            labelEl.style.pointerEvents = 'none';
+            labelEl.style.opacity = '0';
+          }
         }
       });
 

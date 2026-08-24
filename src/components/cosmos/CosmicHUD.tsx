@@ -1,7 +1,16 @@
 import type { LevelInfo } from '../../types';
 import type { CosmicNodeData } from './CosmicNode';
 import { Button } from '../ui/Button';
-import { Zap, Clock, Flame, Sparkles, Play, Target, Compass, Plus } from 'lucide-react';
+import {
+  Zap,
+  Clock,
+  Flame,
+  Sparkles,
+  Play,
+  Target,
+  Compass,
+  Plus,
+} from 'lucide-react';
 
 import type { CorePalette } from '../../utils/palettes';
 import { cn } from '../../lib/utils';
@@ -29,6 +38,7 @@ export function CosmicHUD({
   onOpenCreateSkill,
   onOpenJourney,
 }: CosmicHUDProps) {
+
   const {
     level,
     xpInCurrentLevel,
