@@ -144,24 +144,29 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
         {/* Zero-Skill Empty State Prompt Overlay */}
         {!hasSkills && (
           <div className="absolute inset-0 z-20 flex flex-col items-center justify-center pointer-events-none p-6 text-center">
-            <div className="max-w-md space-y-3 bg-surface/80 border border-edge/80 p-6 rounded-3xl backdrop-blur-xl shadow-2xl pointer-events-auto">
-              <div className="w-12 h-12 mx-auto rounded-2xl bg-accent/20 border border-accent/40 flex items-center justify-center text-accent shadow-[0_0_16px_rgba(129,140,248,0.4)]">
-                <Sparkles size={22} />
+            <div className="max-w-xs space-y-2.5 bg-surface/85 border border-edge/80 p-5 rounded-3xl backdrop-blur-xl shadow-2xl pointer-events-auto">
+              <div className="w-10 h-10 mx-auto rounded-xl bg-accent/15 border border-accent/30 flex items-center justify-center text-accent shadow-[0_0_14px_rgba(129,140,248,0.35)]">
+                <Sparkles size={18} />
               </div>
-              <h3 className="text-lg font-bold text-zinc-100">
-                Your cosmos begins with a skill
-              </h3>
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                Add a deliberate practice skill to ignite your personal growth constellation. Every hour of focused investment visibly shapes your universe.
+              <div className="space-y-0.5">
+                <span className="text-[9px] font-bold uppercase tracking-widest text-accent block">
+                  Begin Your Universe
+                </span>
+                <h3 className="text-sm font-bold text-zinc-100">
+                  Add your first skill
+                </h3>
+              </div>
+              <p className="text-[11px] text-zinc-400 leading-snug">
+                Every hour of deliberate practice visibly expands your personal cosmic network.
               </p>
               <Button
                 variant="primary"
-                size="md"
+                size="sm"
                 onClick={onOpenCreateSkill}
-                className="w-full font-bold gap-2 shadow-[0_0_18px_rgba(129,140,248,0.4)] cursor-pointer"
+                className="w-full font-bold gap-1.5 py-2 text-xs shadow-[0_0_16px_rgba(129,140,248,0.4)] cursor-pointer h-8.5"
               >
-                <Plus size={16} />
-                <span>Create Your First Skill</span>
+                <Plus size={14} />
+                <span>Add Skill</span>
               </Button>
             </div>
           </div>

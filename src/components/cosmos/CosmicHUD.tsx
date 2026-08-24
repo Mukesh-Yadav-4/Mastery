@@ -1,7 +1,7 @@
 import type { LevelInfo } from '../../types';
 import type { CosmicNodeData } from './CosmicNode';
 import { Button } from '../ui/Button';
-import { Zap, Clock, Flame, Sparkles, Play, Target, Compass } from 'lucide-react';
+import { Zap, Clock, Flame, Sparkles, Play, Target, Compass, Plus } from 'lucide-react';
 
 import type { CorePalette } from '../../utils/palettes';
 import { cn } from '../../lib/utils';
@@ -112,10 +112,10 @@ export function CosmicHUD({
         </div>
       </div>
 
-      {/* ── Top Right Floating HUD: Mastery Stats ───────────── */}
-      <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-40 hidden sm:flex items-center gap-2 pointer-events-auto">
-        {/* Practice Hours */}
-        <div className="rounded-xl bg-surface/85 border border-edge/60 px-3 py-1.5 backdrop-blur-md shadow-lg shadow-black/30 flex items-center gap-2">
+      {/* ── Top Right Floating HUD: Mastery Stats & Add Skill ── */}
+      <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-40 flex items-center gap-2 pointer-events-auto">
+        {/* Practice Hours (Desktop) */}
+        <div className="rounded-xl bg-surface/85 border border-edge/60 px-3 py-1.5 backdrop-blur-md shadow-lg shadow-black/30 hidden sm:flex items-center gap-2">
           <Clock size={14} className="text-accent" />
           <div className="text-right">
             <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500 block">
@@ -127,8 +127,8 @@ export function CosmicHUD({
           </div>
         </div>
 
-        {/* Lifetime XP -> MASTERY XP */}
-        <div className="rounded-xl bg-surface/85 border border-edge/60 px-3 py-1.5 backdrop-blur-md shadow-lg shadow-black/30 flex items-center gap-2">
+        {/* Lifetime XP -> MASTERY XP (Desktop) */}
+        <div className="rounded-xl bg-surface/85 border border-edge/60 px-3 py-1.5 backdrop-blur-md shadow-lg shadow-black/30 hidden md:flex items-center gap-2">
           <Sparkles size={14} className="text-cyan-400" />
           <div className="text-right">
             <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500 block">
@@ -140,8 +140,8 @@ export function CosmicHUD({
           </div>
         </div>
 
-        {/* Streak */}
-        <div className="rounded-xl bg-surface/85 border border-edge/60 px-3 py-1.5 backdrop-blur-md shadow-lg shadow-black/30 flex items-center gap-2">
+        {/* Streak (Desktop) */}
+        <div className="rounded-xl bg-surface/85 border border-edge/60 px-3 py-1.5 backdrop-blur-md shadow-lg shadow-black/30 hidden sm:flex items-center gap-2">
           <Flame size={14} className="text-orange-400" />
           <div className="text-right">
             <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500 block">
@@ -152,6 +152,19 @@ export function CosmicHUD({
             </span>
           </div>
         </div>
+
+        {/* Unobtrusive Floating Add Skill Action */}
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={onOpenCreateSkill}
+          className="rounded-xl bg-surface/85 hover:bg-surface border border-edge/60 hover:border-accent/50 px-2.5 sm:px-3 py-1.5 backdrop-blur-md shadow-lg shadow-black/30 text-xs font-semibold text-zinc-200 hover:text-white flex items-center gap-1.5 cursor-pointer transition-all h-9"
+          title="Add a skill"
+          aria-label="Add a skill"
+        >
+          <Plus size={14} className="text-accent" />
+          <span>Add Skill</span>
+        </Button>
       </div>
 
       {/* ── Bottom Floating Dock: Compact Active Capability HUD ── */}

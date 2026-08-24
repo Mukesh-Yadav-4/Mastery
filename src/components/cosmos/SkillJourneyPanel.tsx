@@ -74,7 +74,6 @@ export function SkillJourneyPanel({
       }
     }
 
-    // Capture pointer events on document
     const timer = setTimeout(() => {
       document.addEventListener('pointerdown', handlePointerDown);
     }, 50);
@@ -134,30 +133,30 @@ export function SkillJourneyPanel({
         aria-hidden="true"
       />
 
-      {/* ── Main Skill Journey Container (Floating Overlay) ───── */}
+      {/* ── Main Skill Journey Container (Compact Floating Overlay) ───── */}
       <aside
         ref={panelRef}
         onPointerDown={(e) => e.stopPropagation()}
         className={cn(
-          // Desktop & Tablet Floating Right-Side Panel
-          'md:absolute md:right-4 md:top-4 md:bottom-4 md:w-[350px] lg:w-[380px] md:z-40',
+          // Desktop & Tablet: Compact Floating Right-Side Panel (Max Height 480px, sitting below top HUD)
+          'md:absolute md:right-4 md:top-20 md:w-[330px] lg:w-[350px] md:max-h-[490px] md:z-40',
           'md:rounded-3xl md:border md:border-edge/80 md:bg-[#070a16]/95 md:backdrop-blur-xl md:shadow-2xl md:shadow-black/90',
           // Mobile Fixed Bottom Sheet
-          'fixed inset-x-0 bottom-0 z-50 max-h-[85dvh] rounded-t-3xl border-t border-edge/80 bg-[#070a16]/98 backdrop-blur-2xl shadow-2xl p-4 sm:p-5 md:p-5',
+          'fixed inset-x-0 bottom-0 z-50 max-h-[82dvh] rounded-t-3xl border-t border-edge/80 bg-[#070a16]/98 backdrop-blur-2xl shadow-2xl p-4 sm:p-5 md:p-4',
           'flex flex-col justify-between overflow-y-auto select-none transition-all duration-300 ease-out animate-fade-in',
           className,
         )}
         aria-label={`Skill Journey for ${node.name}`}
       >
-        <div className="space-y-4">
-          {/* ── 1. Header ──────────────────────────────────────── */}
-          <div className="flex items-start justify-between gap-3 pb-3 border-b border-edge/40">
-            <div className="flex items-center gap-3 min-w-0">
+        <div className="space-y-3">
+          {/* ── 1. Compact Header ───────────────────────────────── */}
+          <div className="flex items-start justify-between gap-2.5 pb-2.5 border-b border-edge/40">
+            <div className="flex items-center gap-2.5 min-w-0">
               <div
-                className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0 border border-white/20 shadow-lg"
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0 border border-white/20 shadow-md"
                 style={{
                   backgroundColor: `${node.color}25`,
-                  boxShadow: `0 0 20px ${node.color}40`,
+                  boxShadow: `0 0 16px ${node.color}40`,
                 }}
               >
                 {node.icon}
@@ -165,21 +164,21 @@ export function SkillJourneyPanel({
 
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5 truncate">
-                  <h3 className="text-sm sm:text-base font-bold text-zinc-100 uppercase tracking-tight truncate">
+                  <h3 className="text-sm font-bold text-zinc-100 uppercase tracking-tight truncate">
                     {node.name}
                   </h3>
-                  <span className="flex items-center gap-0.5 text-[10px] font-bold text-accent px-1.5 py-0.5 rounded-full bg-accent/15 border border-accent/30 flex-shrink-0">
-                    <Zap size={10} className="fill-current" />
+                  <span className="flex items-center gap-0.5 text-[9px] font-bold text-accent px-1.5 py-0.2 rounded-full bg-accent/15 border border-accent/30 flex-shrink-0">
+                    <Zap size={9} className="fill-current" />
                     Lv.{node.level}
                   </span>
                 </div>
 
-                <div className="flex items-center gap-2 mt-0.5 text-xs text-zinc-400">
+                <div className="flex items-center gap-1.5 text-[11px] text-zinc-400">
                   <span className="font-semibold text-zinc-300">
-                    {node.formattedDuration} invested
+                    {node.formattedDuration}
                   </span>
                   <span className="text-zinc-600">•</span>
-                  <span className="text-[10px] font-medium text-zinc-400">
+                  <span className="text-[10px] text-zinc-400">
                     Goal: {node.targetHours}h
                   </span>
                 </div>
@@ -187,37 +186,37 @@ export function SkillJourneyPanel({
             </div>
 
             {/* Actions: Delete & Close */}
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-0.5 flex-shrink-0">
               <button
                 type="button"
                 onClick={() => setShowDeleteModal(true)}
-                className="p-1.5 rounded-xl text-zinc-500 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/30 transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
                 title="Delete Skill"
                 aria-label="Delete Skill"
               >
-                <Trash2 size={16} />
+                <Trash2 size={15} />
               </button>
 
               <button
                 type="button"
                 onClick={onClose}
-                className="p-1.5 rounded-xl text-zinc-400 hover:text-zinc-100 hover:bg-surface border border-transparent hover:border-edge/60 transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-surface transition-colors cursor-pointer"
                 title="Close Journey Panel (Esc)"
                 aria-label="Close"
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
           </div>
 
-          {/* ── 2. Category Switcher (Safe In-Place Editing) ───── */}
+          {/* ── 2. Compact Category Selector ────────────────────── */}
           <div className="relative" ref={categoryMenuRef}>
-            <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-surface/60 border border-edge/50 text-xs">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">
-                  Journey Category:
+            <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-surface/60 border border-edge/50 text-xs">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="text-[9px] uppercase font-bold text-zinc-500 tracking-wider">
+                  Journey:
                 </span>
-                <span className="font-semibold text-zinc-200 flex items-center gap-1">
+                <span className="font-semibold text-zinc-200 text-[11px] flex items-center gap-1">
                   <span>{currentCategoryInfo.icon}</span>
                   <span>{currentCategoryInfo.label}</span>
                 </span>
@@ -226,70 +225,69 @@ export function SkillJourneyPanel({
               <button
                 type="button"
                 onClick={() => setShowCategoryMenu((prev) => !prev)}
-                className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-surface hover:bg-surface-elevated border border-edge/60 text-[11px] font-medium text-accent hover:text-indigo-300 transition-colors cursor-pointer"
+                className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface hover:bg-surface-elevated border border-edge/60 text-[10px] font-medium text-accent hover:text-indigo-300 transition-colors cursor-pointer"
               >
-                <span>Change</span>
-                <ChevronDown size={12} className={cn('transition-transform', showCategoryMenu && 'rotate-180')} />
+                <span>Edit</span>
+                <ChevronDown size={11} className={cn('transition-transform', showCategoryMenu && 'rotate-180')} />
               </button>
             </div>
 
             {/* Dropdown Menu */}
             {showCategoryMenu && (
-              <div className="absolute left-0 right-0 top-full mt-1.5 z-50 p-1.5 rounded-2xl bg-[#0b0e22] border border-edge/80 shadow-2xl space-y-1 animate-fade-in">
+              <div className="absolute left-0 right-0 top-full mt-1 z-50 p-1.5 rounded-xl bg-[#0b0e22] border border-edge/80 shadow-2xl space-y-0.5 animate-fade-in">
                 {CATEGORY_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
                     type="button"
                     onClick={() => handleCategorySelect(opt.value)}
                     className={cn(
-                      'w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-medium text-left transition-colors cursor-pointer',
+                      'w-full flex items-center justify-between px-2 py-1 rounded-lg text-xs font-medium text-left transition-colors cursor-pointer',
                       currentCategory === opt.value
                         ? 'bg-accent/20 text-accent border border-accent/40 font-bold'
                         : 'text-zinc-300 hover:bg-surface hover:text-white',
                     )}
                   >
-                    <span className="flex items-center gap-2">
+                    <span className="flex items-center gap-1.5 text-[11px]">
                       <span>{opt.icon}</span>
                       <span>{opt.label}</span>
                     </span>
-                    {opt.value === 'generic' ? (
-                      <span className="text-[10px] text-zinc-500">4 Stages</span>
-                    ) : (
-                      <span className="text-[10px] text-zinc-500">Curated</span>
-                    )}
+                    <span className="text-[9px] text-zinc-500">
+                      {opt.value === 'generic' ? '4 Stages' : 'Curated'}
+                    </span>
                   </button>
                 ))}
               </div>
             )}
           </div>
 
-          {/* ── 3. Current Stage & Horizon Card ─────────────────── */}
-          <div className="rounded-2xl bg-surface/80 border border-edge/70 p-3.5 space-y-3 shadow-inner">
+          {/* ── 3. Current Stage & Next Horizon ─────────────────── */}
+          <div className="rounded-2xl bg-surface/80 border border-edge/70 p-3 space-y-2 shadow-inner">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-accent flex items-center gap-1.5">
-                <Layers size={12} />
+              <span className="text-[9px] font-bold uppercase tracking-wider text-accent flex items-center gap-1">
+                <Layers size={11} />
                 Current Stage
               </span>
               <span
-                className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-canvas/80 border border-edge/60"
+                className="px-2 py-0.2 rounded text-[9px] font-black uppercase tracking-wider bg-canvas/80 border border-edge/60"
                 style={{ color: node.color }}
               >
                 {currentStage.name}
               </span>
             </div>
 
-            <p className="text-xs text-zinc-300 leading-relaxed">
+            {/* Description only for current stage */}
+            <p className="text-[11px] text-zinc-300 leading-snug">
               {currentStage.description}
             </p>
 
             {/* Stage Progress Bar */}
-            <div className="space-y-1.5 pt-1">
-              <div className="flex items-center justify-between text-[10px] text-zinc-400 tabular-nums">
+            <div className="space-y-1 pt-0.5">
+              <div className="flex items-center justify-between text-[9px] text-zinc-400 tabular-nums">
                 <span>
                   {totalHours.toFixed(1)}h / {stageMax >= 10000 ? '1,200h+' : `${stageMax}h`}
                 </span>
                 <span className="text-zinc-300 font-semibold">
-                  {Math.round(stageProgressPercent)}% of stage
+                  {Math.round(stageProgressPercent)}%
                 </span>
               </div>
 
@@ -307,10 +305,10 @@ export function SkillJourneyPanel({
 
             {/* Next Horizon Checkpoint */}
             {nextHorizon ? (
-              <div className="pt-2 border-t border-edge/30 flex items-center justify-between text-xs">
-                <div className="flex items-center gap-1.5 text-zinc-300">
-                  <Compass size={13} className="text-cyan-400 flex-shrink-0" />
-                  <span className="font-bold">Next Horizon · {nextHorizon}h</span>
+              <div className="pt-1.5 border-t border-edge/30 flex items-center justify-between text-[11px]">
+                <div className="flex items-center gap-1 text-zinc-300">
+                  <Compass size={12} className="text-cyan-400 flex-shrink-0" />
+                  <span className="font-bold">Next: {nextHorizon}h</span>
                 </div>
                 {typeof hoursRemaining === 'number' && hoursRemaining > 0 && (
                   <span className="text-[10px] text-zinc-400 tabular-nums">
@@ -319,88 +317,68 @@ export function SkillJourneyPanel({
                 )}
               </div>
             ) : (
-              <div className="pt-2 border-t border-edge/30 flex items-center gap-1.5 text-xs text-zinc-300">
-                <Sparkles size={13} className="text-amber-400" />
+              <div className="pt-1.5 border-t border-edge/30 flex items-center gap-1 text-[11px] text-zinc-300">
+                <Sparkles size={12} className="text-amber-400" />
                 <span className="font-bold">Journey Milestone Reached</span>
               </div>
             )}
           </div>
 
-          {/* ── 4. Growth Path Visualization ─────────────────────── */}
-          <div className="space-y-2 pt-1">
-            <div className="flex items-center justify-between">
-              <h4 className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
-                Your Growth Path
-              </h4>
-              <span className="text-[10px] text-zinc-500 font-medium truncate max-w-[180px]">
+          {/* ── 4. Compact Growth Path Track (Internally Scrollable) ─ */}
+          <div className="space-y-1.5 pt-0.5">
+            <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-wider text-zinc-500">
+              <span>Growth Path</span>
+              <span className="font-normal text-zinc-500 truncate max-w-[140px]">
                 {profile.title}
               </span>
             </div>
 
-            <div className="relative pl-6 space-y-3.5 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-edge/50">
+            <div className="max-h-[110px] overflow-y-auto pr-1 pl-4 relative space-y-2 before:absolute before:left-1.5 before:top-1.5 before:bottom-1.5 before:w-0.5 before:bg-edge/50">
               {profile.stages.map((stg) => {
                 const isCompleted = totalHours >= stg.maxHours && stg.maxHours < 10000;
                 const isCurrent = currentStage.id === stg.id;
 
                 return (
-                  <div key={stg.id} className="relative flex items-start gap-2.5 group">
+                  <div key={stg.id} className="relative flex items-center justify-between text-[11px] gap-2">
                     {/* Node Dot on Cosmic Track */}
                     <div
                       className={cn(
-                        'absolute -left-6 top-1 w-5 h-5 rounded-full flex items-center justify-center border transition-all duration-300',
+                        'absolute -left-4 w-3.5 h-3.5 rounded-full flex items-center justify-center border transition-all duration-300',
                         isCompleted
-                          ? 'bg-accent/20 border-accent text-accent shadow-[0_0_10px_rgba(129,140,248,0.5)]'
+                          ? 'bg-accent/20 border-accent text-accent'
                           : isCurrent
-                          ? 'bg-cyan-400/20 border-cyan-400 text-cyan-300 ring-2 ring-cyan-400/40 shadow-[0_0_14px_rgba(34,211,238,0.7)]'
-                          : 'bg-canvas/80 border-edge/60 text-zinc-600',
+                          ? 'bg-cyan-400/20 border-cyan-400 ring-2 ring-cyan-400/40 shadow-[0_0_8px_rgba(34,211,238,0.7)]'
+                          : 'bg-canvas/80 border-edge/60',
                       )}
                     >
                       {isCompleted ? (
-                        <CheckCircle2 size={12} className="text-accent" />
+                        <CheckCircle2 size={9} className="text-accent" />
                       ) : (
                         <div
                           className={cn(
-                            'w-2 h-2 rounded-full',
+                            'w-1.5 h-1.5 rounded-full',
                             isCurrent ? 'bg-cyan-400 animate-pulse' : 'bg-zinc-600',
                           )}
                         />
                       )}
                     </div>
 
-                    {/* Stage Details */}
-                    <div className="min-w-0 flex-1 space-y-0.5">
-                      <div className="flex items-center justify-between gap-1">
-                        <span
-                          className={cn(
-                            'text-xs font-bold transition-colors',
-                            isCurrent
-                              ? 'text-cyan-300'
-                              : isCompleted
-                              ? 'text-zinc-200'
-                              : 'text-zinc-500',
-                          )}
-                        >
-                          {stg.name}
-                        </span>
+                    <span
+                      className={cn(
+                        'font-medium truncate',
+                        isCurrent
+                          ? 'text-cyan-300 font-bold'
+                          : isCompleted
+                          ? 'text-zinc-200'
+                          : 'text-zinc-500',
+                      )}
+                    >
+                      {stg.name}
+                    </span>
 
-                        <span className="text-[10px] font-semibold text-zinc-500 tabular-nums">
-                          {stg.minHours}–{stg.maxHours >= 10000 ? '1,200h+' : `${stg.maxHours}h`}
-                        </span>
-                      </div>
-
-                      <p
-                        className={cn(
-                          'text-[11px] leading-tight',
-                          isCurrent
-                            ? 'text-zinc-300'
-                            : isCompleted
-                            ? 'text-zinc-400'
-                            : 'text-zinc-600',
-                        )}
-                      >
-                        {stg.description}
-                      </p>
-                    </div>
+                    <span className="text-[10px] text-zinc-500 font-semibold tabular-nums flex-shrink-0">
+                      {stg.minHours}–{stg.maxHours >= 10000 ? '1,200h+' : `${stg.maxHours}h`}
+                    </span>
                   </div>
                 );
               })}
@@ -409,14 +387,14 @@ export function SkillJourneyPanel({
         </div>
 
         {/* ── 5. Primary Start Focus CTA ───────────────────────── */}
-        <div className="pt-4 mt-2 border-t border-edge/50">
+        <div className="pt-2.5 mt-2 border-t border-edge/50">
           <Button
             variant="primary"
-            size="md"
+            size="sm"
             onClick={() => onStartFocus(node.id)}
-            className="w-full font-bold gap-2 py-2.5 text-sm shadow-[0_0_20px_rgba(129,140,248,0.4)] hover:shadow-[0_0_28px_rgba(129,140,248,0.6)] cursor-pointer"
+            className="w-full font-bold gap-1.5 py-2 text-xs shadow-[0_0_16px_rgba(129,140,248,0.4)] hover:shadow-[0_0_24px_rgba(129,140,248,0.6)] cursor-pointer h-8.5"
           >
-            <Play size={15} className="fill-current" />
+            <Play size={13} className="fill-current" />
             <span>Start Focus on {node.name}</span>
           </Button>
         </div>
