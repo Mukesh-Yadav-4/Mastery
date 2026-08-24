@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useApp } from '../../context/AppContext';
 import { Button } from '../ui/Button';
-import { LogOut, Flame, Zap, Sparkles, Check } from 'lucide-react';
+import { LogOut, Flame, Zap, Sparkles, Check, Share2 } from 'lucide-react';
 import { formatDuration } from '../../utils/calculations';
 import { CORE_PALETTES_LIST } from '../../utils/palettes';
+import { ShareProgressModal } from '../share/ShareProgressModal';
 import { cn } from '../../lib/utils';
 
 export function Settings() {
@@ -19,9 +21,22 @@ export function Settings() {
     setPaletteId,
   } = useApp();
 
+  const [showShareModal, setShowShareModal] = useState(false);
+
   return (
     <div className="animate-fade-in space-y-6">
-      <h1 className="text-lg font-semibold text-zinc-100">Profile & Journey</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg font-semibold text-zinc-100">Profile & Journey</h1>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setShowShareModal(true)}
+          className="flex items-center gap-1.5 cursor-pointer border border-accent/40 hover:border-accent"
+        >
+          <Share2 size={13} className="text-accent" />
+          <span>Share Progress Card</span>
+        </Button>
+      </div>
 
       {/* User info */}
       <div className="rounded-card bg-surface border border-edge/30 p-5">
@@ -176,6 +191,12 @@ export function Settings() {
           ) : null}
         </div>
       </div>
+
+      {/* Share Progress Card Modal */}
+      <ShareProgressModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+      />
     </div>
   );
 }

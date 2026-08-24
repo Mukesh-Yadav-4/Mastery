@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
 import { useApp } from '../../context/AppContext';
 import { cn } from '../../lib/utils';
 import {
-  LogOut,
   LayoutDashboard,
   History,
+  BarChart2,
   User,
   Compass,
   Volume2,
@@ -13,6 +12,7 @@ import {
 } from 'lucide-react';
 import type { ActiveView } from '../../types';
 import { soundEngine, AMBIENT_TRACKS, type AmbientTrackId } from '../../utils/audio';
+import { AudioMiniPlayer } from '../audio/AudioMiniPlayer';
 
 interface NavItem {
   view: ActiveView;
@@ -23,6 +23,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { view: 'dashboard', label: 'Home', icon: LayoutDashboard },
   { view: 'history', label: 'History', icon: History },
+  { view: 'analytics', label: 'Analytics', icon: BarChart2 },
   { view: 'settings', label: 'Profile', icon: User },
 ];
 
@@ -33,14 +34,14 @@ export function AppShell({
   children: React.ReactNode;
   onNavigateLanding?: () => void;
 }) {
-  const { signOut } = useAuth();
-  const { activeView, setActiveView, activeTimer } = useApp();
+  const { activeView, setActiveView, activeTimer, pauseTimer, resumeTimer } = useApp();
   const [isAmbienceOn, setIsAmbienceOn] = useState(() =>
     soundEngine.getIsAmbienceActive(),
   );
   const [activeTrack, setActiveTrack] = useState<AmbientTrackId>(() =>
     soundEngine.getActiveTrackId(),
   );
+  const [showAudioPlayer, setShowAudioPlayer] = useState(false);
 
   useEffect(() => {
     const unsubAudio = soundEngine.subscribeAmbience((playing) =>
@@ -54,6 +55,38 @@ export function AppShell({
       unsubTrack();
     };
   }, []);
+
+  // Global Keyboard Shortcuts (M: Mute/Unmute, T: Next Track, Space: Timer Pause/Resume)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeTag = (document.activeElement?.tagName || '').toLowerCase();
+      const isInput =
+        activeTag === 'input' ||
+        activeTag === 'textarea' ||
+        activeTag === 'select' ||
+        (document.activeElement as HTMLElement)?.isContentEditable;
+
+      if (isInput) return;
+
+      if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault();
+        soundEngine.toggleAmbience();
+      } else if (e.key === 't' || e.key === 'T') {
+        e.preventDefault();
+        soundEngine.nextTrack();
+      } else if (e.key === ' ' && activeTimer) {
+        e.preventDefault();
+        if (activeTimer.status === 'running') {
+          pauseTimer();
+        } else {
+          resumeTimer();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeTimer, pauseTimer, resumeTimer]);
 
   const handleToggleAmbience = () => {
     soundEngine.toggleAmbience();
@@ -72,7 +105,7 @@ export function AppShell({
       )}
     >
       {/* Desktop Header */}
-      <header className="hidden md:flex items-center justify-between px-6 h-14 flex-shrink-0 border-b border-white/[0.08] bg-[#060813]/65 backdrop-blur-xl sticky top-0 z-40">
+      <header className="hidden md:flex items-center justify-between px-6 h-14 flex-shrink-0 border-b border-white/[0.08] bg-[#060813]/65 backdrop-blur-xl sticky top-0 z-50">
         <div className="flex items-center gap-4">
           <button
             type="button"
@@ -105,52 +138,56 @@ export function AppShell({
             ))}
           </div>
 
-          {/* Ambient Cosmic Soundscape Button & Track Switcher */}
-          <div className="flex items-center rounded-xl bg-white/[0.03] border border-white/[0.08] p-0.5">
-            <button
-              type="button"
-              onClick={handleToggleAmbience}
-              className={cn(
-                'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer',
-                isAmbienceOn
-                  ? 'bg-accent/20 text-accent shadow-[0_0_12px_rgba(129,140,248,0.3)]'
-                  : 'text-zinc-400 hover:text-zinc-200',
-              )}
-              title={isAmbienceOn ? 'Mute Ambience' : 'Play Ambience'}
-            >
-              {isAmbienceOn ? (
-                <>
-                  <Volume2 size={13} className="text-accent animate-pulse" />
-                  <span className="hidden sm:inline font-semibold">
-                    {AMBIENT_TRACKS.find((t) => t.id === activeTrack)?.shortName ?? 'Music'}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <VolumeX size={13} className="text-zinc-500" />
-                  <span className="hidden sm:inline">Ambience</span>
-                </>
-              )}
-            </button>
-
-            {/* Quick Track Switcher Pill */}
-            {isAmbienceOn && (
+          {/* Ambient Cosmic Soundscape Button & Mini-Player Drawer */}
+          <div className="relative">
+            <div className="flex items-center rounded-xl bg-white/[0.03] border border-white/[0.08] p-0.5 backdrop-blur-md">
               <button
                 type="button"
-                onClick={() => {
-                  const currentIndex = AMBIENT_TRACKS.findIndex(
-                    (t) => t.id === activeTrack,
-                  );
-                  const nextTrack =
-                    AMBIENT_TRACKS[(currentIndex + 1) % AMBIENT_TRACKS.length];
-                  soundEngine.setTrack(nextTrack.id);
-                }}
-                className="px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-all cursor-pointer"
-                title={`Next: ${AMBIENT_TRACKS[(AMBIENT_TRACKS.findIndex((t) => t.id === activeTrack) + 1) % AMBIENT_TRACKS.length].name}`}
+                onClick={handleToggleAmbience}
+                className={cn(
+                  'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer',
+                  isAmbienceOn
+                    ? 'bg-accent/20 text-accent shadow-[0_0_12px_rgba(129,140,248,0.3)]'
+                    : 'text-zinc-400 hover:text-zinc-200',
+                )}
+                title={isAmbienceOn ? 'Mute Ambience (M)' : 'Play Ambience (M)'}
               >
-                Track ⇄
+                {isAmbienceOn ? (
+                  <>
+                    <Volume2 size={13} className="text-accent animate-pulse" />
+                    <span className="hidden sm:inline font-semibold">
+                      {AMBIENT_TRACKS.find((t) => t.id === activeTrack)?.shortName ?? 'Music'}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <VolumeX size={13} className="text-zinc-500" />
+                    <span className="hidden sm:inline">Ambience</span>
+                  </>
+                )}
               </button>
-            )}
+
+              {/* Mini Player & Volume Trigger */}
+              <button
+                type="button"
+                onClick={() => setShowAudioPlayer((prev) => !prev)}
+                className={cn(
+                  'px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1',
+                  showAudioPlayer
+                    ? 'bg-white/[0.12] text-white shadow-sm'
+                    : 'text-zinc-400 hover:text-white hover:bg-white/[0.08]',
+                )}
+                title="Open Ambient Player & Volume Controls"
+              >
+                <span>Track ⇄</span>
+              </button>
+            </div>
+
+            {/* Audio Mini-Player Popover */}
+            <AudioMiniPlayer
+              isOpen={showAudioPlayer}
+              onClose={() => setShowAudioPlayer(false)}
+            />
           </div>
 
           {onNavigateLanding && (
@@ -164,18 +201,6 @@ export function AppShell({
               <span>About</span>
             </button>
           )}
-
-          <div className="w-px h-5 bg-white/[0.08] mx-1" />
-
-          <button
-            type="button"
-            onClick={signOut}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-zinc-400 hover:text-red-300 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all duration-150 cursor-pointer"
-            aria-label="Sign out"
-          >
-            <LogOut size={13} />
-            <span className="hidden lg:inline">Sign out</span>
-          </button>
         </nav>
       </header>
 

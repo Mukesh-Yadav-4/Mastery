@@ -35,7 +35,7 @@ export function SessionCompletionModal({
       setProgressPercent(reward.newLevelInfo.progressPercentage);
       setShowLevelUpAlert(reward.didLevelUp || reward.didSkillLevelUp);
       if (reward.didLevelUp || reward.didSkillLevelUp) {
-        soundEngine.playFanfare();
+        soundEngine.playLevelUp();
       } else {
         soundEngine.playChime();
       }
@@ -44,7 +44,7 @@ export function SessionCompletionModal({
 
     // Sound effect
     if (reward.didLevelUp || reward.didSkillLevelUp) {
-      soundEngine.playFanfare();
+      soundEngine.playLevelUp();
     } else {
       soundEngine.playChime();
     }

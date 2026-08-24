@@ -102,7 +102,7 @@ export interface TimerState {
 
 // ── UI State ──────────────────────────────────────────────────
 
-export type ActiveView = 'dashboard' | 'timer' | 'history' | 'settings';
+export type ActiveView = 'dashboard' | 'timer' | 'history' | 'analytics' | 'settings';
 
 export interface NewSkillData {
   name: string;
@@ -132,6 +132,9 @@ export interface SessionRewardData {
   earnedXP: number;
   baseXP: number;
   bonusXP: number;
+  intentionBonus?: number;
+  reflectionBonus?: number;
+  streakBonus?: number;
   previousLevelInfo: LevelInfo;
   newLevelInfo: LevelInfo;
   didLevelUp: boolean;
@@ -150,6 +153,9 @@ export interface CosmicFeedbackEvent {
   xpEarned: number;
   baseXP: number;
   bonusXP: number;
+  intentionBonus?: number;
+  reflectionBonus?: number;
+  streakBonus?: number;
   previousSeconds: number;
   newSeconds: number;
   previousHours: number;

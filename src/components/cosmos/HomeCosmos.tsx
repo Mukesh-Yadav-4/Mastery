@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Cosmos3DScene, type SceneNodeData } from './Cosmos3DScene';
 import { CosmicHUD } from './CosmicHUD';
@@ -8,10 +8,12 @@ import { CosmicFeedbackOverlay } from './CosmicFeedbackOverlay';
 import { formatDuration } from '../../utils/calculations';
 import { getSkillProgressionState } from '../../utils/progression';
 import type { CosmicNodeData } from './CosmicNode';
-import { Plus, Sparkles } from 'lucide-react';
+import { Plus, Sparkles, Wand2 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { CosmicDevTools } from '../dev/CosmicDevTools';
 import { StartFocusModal } from '../focus/StartFocusModal';
+import { OnboardingModal } from '../onboarding/OnboardingModal';
+import type { StarterPack } from '../../utils/starterPacks';
 import type { Skill } from '../../types';
 
 export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => void }) {
@@ -24,15 +26,27 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
     globalLevelInfo,
     corePalette,
     startTimer,
+    createSkillsBatch,
     activeFeedbackEvent,
     dismissFeedback,
   } = useApp();
 
   const [focusLauncherSkill, setFocusLauncherSkill] = useState<Skill | null>(null);
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
 
   const [feedbackPhase, setFeedbackPhase] = useState<
     'idle' | 'focus' | 'core_charge' | 'transfer' | 'absorption' | 'reveal' | 'settled'
   >('idle');
+
+  // Reset feedback phase whenever an event is dismissed so the NEXT session
+  // always starts from 'idle' and plays the full cinematic animation.
+  // Without this, feedbackPhase stays at 'reveal' and the overlay appears
+  // instantly (with no animation) the second time a session completes.
+  useEffect(() => {
+    if (!activeFeedbackEvent) {
+      setFeedbackPhase('idle');
+    }
+  }, [activeFeedbackEvent]);
 
   // Map ONLY real active user skills into 3D scene node data with progression profiles
   const sceneNodes: SceneNodeData[] = useMemo(() => {
@@ -209,33 +223,63 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
         {/* Zero-Skill Empty State Prompt Overlay */}
         {!hasSkills && (
           <div className="absolute inset-0 z-20 flex flex-col items-center justify-center pointer-events-none p-6 text-center">
-            <div className="max-w-xs space-y-2.5 bg-surface/85 border border-edge/80 p-5 rounded-3xl backdrop-blur-xl shadow-2xl pointer-events-auto">
-              <div className="w-10 h-10 mx-auto rounded-xl bg-accent/15 border border-accent/30 flex items-center justify-center text-accent shadow-[0_0_14px_rgba(129,140,248,0.35)]">
-                <Sparkles size={18} />
+            <div className="max-w-sm space-y-3 bg-surface/90 border border-edge/80 p-6 rounded-3xl backdrop-blur-xl shadow-2xl pointer-events-auto animate-fade-in">
+              <div className="w-12 h-12 mx-auto rounded-2xl bg-accent/20 border border-accent/40 flex items-center justify-center text-accent shadow-[0_0_20px_rgba(129,140,248,0.4)]">
+                <Sparkles size={22} />
               </div>
-              <div className="space-y-0.5">
-                <span className="text-[9px] font-bold uppercase tracking-widest text-accent block">
-                  Begin Your Universe
+              <div className="space-y-1">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-accent block">
+                  Begin Your Journey
                 </span>
-                <h3 className="text-sm font-bold text-zinc-100">
-                  Add your first skill
+                <h3 className="text-base font-bold text-zinc-100">
+                  Ignite Your Universe
                 </h3>
               </div>
-              <p className="text-[11px] text-zinc-400 leading-snug">
-                Every hour of deliberate practice visibly expands your personal cosmic network.
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Choose a curated deliberate practice pack or add your own custom skill to start tracking deep focus hours.
               </p>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={onOpenCreateSkill}
-                className="w-full font-bold gap-1.5 py-2 text-xs shadow-[0_0_16px_rgba(129,140,248,0.4)] cursor-pointer h-8.5"
-              >
-                <Plus size={14} />
-                <span>Add Skill</span>
-              </Button>
+              <div className="space-y-2 pt-1">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => setIsOnboardingOpen(true)}
+                  className="w-full font-bold gap-2 py-2 text-xs shadow-[0_0_16px_rgba(129,140,248,0.4)] cursor-pointer h-9"
+                >
+                  <Wand2 size={14} />
+                  <span>Explore Starter Packs</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onOpenCreateSkill}
+                  className="w-full text-xs text-zinc-400 hover:text-zinc-200 border border-edge/40 hover:border-zinc-500 cursor-pointer h-8.5"
+                >
+                  <Plus size={13} />
+                  <span>Create Single Custom Skill</span>
+                </Button>
+              </div>
             </div>
           </div>
         )}
+
+        {/* First-Time Onboarding Starter Packs Modal */}
+        <OnboardingModal
+          isOpen={isOnboardingOpen}
+          onClose={() => setIsOnboardingOpen(false)}
+          onSelectPack={(pack: StarterPack) => {
+            createSkillsBatch(
+              pack.skills.map((s) => ({
+                name: s.name,
+                description: s.description,
+                icon: s.icon,
+                color: s.color,
+                category: s.category,
+                targetHours: s.targetHours,
+              })),
+            );
+          }}
+          onCustomStart={onOpenCreateSkill}
+        />
 
         {/* 3D WebGL Canvas Viewport */}
         <Cosmos3DScene

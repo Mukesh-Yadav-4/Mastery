@@ -123,7 +123,7 @@ export function CosmicHUD({
       </div>
 
       {/* ── Top Right Floating HUD: Mastery Stats & Add Skill ── */}
-      <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-40 flex items-center gap-2 pointer-events-auto">
+      <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20 flex items-center gap-2 pointer-events-auto">
         {/* Practice Hours (Desktop) */}
         <div className="rounded-xl bg-surface/85 border border-edge/60 px-3 py-1.5 backdrop-blur-md shadow-lg shadow-black/30 hidden sm:flex items-center gap-2">
           <Clock size={14} className="text-accent" />

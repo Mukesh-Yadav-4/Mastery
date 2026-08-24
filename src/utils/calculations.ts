@@ -142,33 +142,59 @@ export function getTodayTotalSeconds(sessions: FocusSession[]): number {
   );
 }
 
-// ── XP & Level Progression Engine ─────────────────────────────
+export interface XPExtras {
+  hasIntention?: boolean;
+  hasReflection?: boolean;
+  streakDays?: number;
+}
 
 /**
  * Calculate detailed XP breakdown for a focus session.
- * - 1 minute of completed practice = 1 base XP.
- * - Adds completion bonus for completed sessions based on duration tier.
- * - Cancelled sessions earn 0 bonus XP.
+ * - 1 minute of completed practice = 1 base XP (capped at 180m / 3h per session).
+ * - Adds completion bonus based on duration tier.
+ * - Adds +5 XP Deliberate Intention bonus if a micro-goal was set.
+ * - Adds +5 XP Reflection Insight bonus if reflection was written.
+ * - Adds Streak Momentum bonus (+5% to +15%) for active practice streaks.
+ * - Cancelled sessions earn 0 bonuses.
  */
 export function getSessionXPBreakdown(
   durationSeconds: number,
   status: 'completed' | 'cancelled' = 'completed',
+  extras: XPExtras = {},
 ): {
   baseXP: number;
   bonusXP: number;
+  intentionBonus: number;
+  reflectionBonus: number;
+  streakBonus: number;
   totalXP: number;
 } {
   if (durationSeconds <= 0) {
-    return { baseXP: 0, bonusXP: 0, totalXP: 0 };
+    return {
+      baseXP: 0,
+      bonusXP: 0,
+      intentionBonus: 0,
+      reflectionBonus: 0,
+      streakBonus: 0,
+      totalXP: 0,
+    };
   }
 
   const minutes = Math.floor(durationSeconds / 60);
   const baseXP = minutes;
 
   if (status === 'cancelled') {
-    return { baseXP, bonusXP: 0, totalXP: baseXP };
+    return {
+      baseXP,
+      bonusXP: 0,
+      intentionBonus: 0,
+      reflectionBonus: 0,
+      streakBonus: 0,
+      totalXP: baseXP,
+    };
   }
 
+  // 1. Duration completion tier bonus
   let bonusXP = 0;
   for (const tier of SESSION_COMPLETION_BONUS_TIERS) {
     if (minutes >= tier.minMinutes) {
@@ -177,10 +203,33 @@ export function getSessionXPBreakdown(
     }
   }
 
+  // 2. Deliberate Intention micro-goal bonus (+5 XP)
+  const intentionBonus = extras.hasIntention && minutes >= 10 ? 5 : 0;
+
+  // 3. Post-session reflection insight bonus (+5 XP)
+  const reflectionBonus = extras.hasReflection && minutes >= 10 ? 5 : 0;
+
+  // 4. Daily Streak Momentum bonus (+5% to +15%)
+  let streakBonus = 0;
+  const streak = extras.streakDays ?? 0;
+  if (streak >= 14 && minutes >= 10) {
+    streakBonus = Math.max(3, Math.round(baseXP * 0.15));
+  } else if (streak >= 7 && minutes >= 10) {
+    streakBonus = Math.max(2, Math.round(baseXP * 0.10));
+  } else if (streak >= 3 && minutes >= 10) {
+    streakBonus = Math.max(1, Math.round(baseXP * 0.05));
+  }
+
+  const totalXP =
+    baseXP + bonusXP + intentionBonus + reflectionBonus + streakBonus;
+
   return {
     baseXP,
     bonusXP,
-    totalXP: baseXP + bonusXP,
+    intentionBonus,
+    reflectionBonus,
+    streakBonus,
+    totalXP,
   };
 }
 
@@ -188,8 +237,9 @@ export function getSessionXPBreakdown(
 export function calculateSessionXP(
   durationSeconds: number,
   status: 'completed' | 'cancelled' = 'completed',
+  extras: XPExtras = {},
 ): number {
-  return getSessionXPBreakdown(durationSeconds, status).totalXP;
+  return getSessionXPBreakdown(durationSeconds, status, extras).totalXP;
 }
 
 /** Calculate cumulative XP threshold required to reach a specific level */
@@ -236,11 +286,29 @@ export function calculateLevelInfo(totalXP: number): LevelInfo {
   };
 }
 
+function hasSessionReflection(s: FocusSession): boolean {
+  if (!s.reflection) return false;
+  const r = s.reflection;
+  return Boolean(
+    (r.notes && r.notes.trim().length > 0) ||
+      (r.friction && r.friction.trim().length > 0) ||
+      r.qualityRating,
+  );
+}
+
 /** Get total XP earned across all completed sessions */
 export function getGlobalTotalXP(sessions: FocusSession[]): number {
   return sessions
     .filter((s) => s.status === 'completed')
-    .reduce((acc, s) => acc + calculateSessionXP(s.durationSeconds, s.status), 0);
+    .reduce(
+      (acc, s) =>
+        acc +
+        calculateSessionXP(s.durationSeconds, s.status, {
+          hasIntention: Boolean(s.intention && s.intention.trim().length > 0),
+          hasReflection: hasSessionReflection(s),
+        }),
+      0,
+    );
 }
 
 /** Get total XP earned for a specific skill */
@@ -250,7 +318,15 @@ export function getSkillTotalXP(
 ): number {
   return sessions
     .filter((s) => s.skillId === skillId && s.status === 'completed')
-    .reduce((acc, s) => acc + calculateSessionXP(s.durationSeconds, s.status), 0);
+    .reduce(
+      (acc, s) =>
+        acc +
+        calculateSessionXP(s.durationSeconds, s.status, {
+          hasIntention: Boolean(s.intention && s.intention.trim().length > 0),
+          hasReflection: hasSessionReflection(s),
+        }),
+      0,
+    );
 }
 
 // ── Skill Progress ────────────────────────────────────────────

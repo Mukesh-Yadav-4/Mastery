@@ -86,8 +86,10 @@ export class SoundEngine {
   private binauralOdyssey: BinauralOdysseyGenerator;
 
   private activeTrackId: AmbientTrackId = 'cyberpunk-rain';
+  private masterVolume: number = 0.5;
   private trackListeners = new Set<(trackId: AmbientTrackId) => void>();
   private ambienceListeners = new Set<(playing: boolean) => void>();
+  private volumeListeners = new Set<(volume: number) => void>();
 
   constructor() {
     this.celestialHorizon = new CosmicAmbienceGenerator(() => this.getCtx());
@@ -96,6 +98,19 @@ export class SoundEngine {
     this.miceOnOrbit = new MiceOnOrbitGenerator(() => this.getCtx());
     this.cyberpunkRain = new CyberpunkRainGenerator(() => this.getCtx());
     this.binauralOdyssey = new BinauralOdysseyGenerator(() => this.getCtx());
+
+    if (typeof window !== 'undefined') {
+      try {
+        const storedVol = localStorage.getItem('mastery_ambient_volume');
+        if (storedVol !== null) {
+          const parsed = parseFloat(storedVol);
+          if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) {
+            this.masterVolume = parsed;
+            this.setAmbienceVolume(parsed);
+          }
+        }
+      } catch {}
+    }
   }
 
   private getCtx(): AudioContext | null {
@@ -240,7 +255,7 @@ export class SoundEngine {
     }
   }
 
-  // ── 4. Deep Tibetan Singing Bowl & Resolution Chime ────────────
+  // ── 4. Subtle & Soothing Zen Session Complete Chime ─────────────
   playChime(enabled = true) {
     if (!enabled) return;
     try {
@@ -248,27 +263,32 @@ export class SoundEngine {
       if (!ctx) return;
 
       const now = ctx.currentTime;
-      const freqs = [264, 528, 792, 1056, 1584];
-      const vols = [0.35, 0.4, 0.22, 0.15, 0.08];
+      // Soft, peaceful pure sine harmonics (C4 + G4 + C5 serene resonant bowl)
+      const harmonics = [
+        { freq: 261.63, gain: 0.07, decay: 2.2 }, // C4 warm body
+        { freq: 392.00, gain: 0.05, decay: 2.0 }, // G4 serene fifth
+        { freq: 523.25, gain: 0.03, decay: 1.8 }, // C5 gentle clarity
+      ];
 
-      freqs.forEach((freq, idx) => {
+      harmonics.forEach(({ freq, gain: maxGain, decay }) => {
         if (!ctx) return;
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
 
-        osc.type = idx === 0 ? 'sine' : idx === 1 ? 'sine' : 'triangle';
+        osc.type = 'sine';
         osc.frequency.setValueAtTime(freq, now);
-        osc.frequency.exponentialRampToValueAtTime(freq * 0.995, now + 2.8);
+        osc.frequency.exponentialRampToValueAtTime(freq * 0.998, now + decay);
 
+        // Soft 50ms linear fade-in to prevent sharp clicks, silky exponential decay
         gain.gain.setValueAtTime(0.0001, now);
-        gain.gain.linearRampToValueAtTime(vols[idx], now + 0.04);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.8);
+        gain.gain.linearRampToValueAtTime(maxGain, now + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + decay);
 
         osc.connect(gain);
         gain.connect(ctx.destination);
 
         osc.start(now);
-        osc.stop(now + 2.8);
+        osc.stop(now + decay);
       });
     } catch {
       // Graceful fallback
@@ -438,6 +458,47 @@ export class SoundEngine {
     }
   }
 
+  // ── 9b. Subtle & Soothing Zen Level Up Chime ────────────────────
+  playLevelUp(enabled = true) {
+    if (!enabled) return;
+    try {
+      const ctx = this.getCtx();
+      if (!ctx) return;
+
+      const now = ctx.currentTime;
+
+      // Soft Dual Sine Droplets (Peaceful D5 -> A5 perfect fifth)
+      const notes = [
+        { freq: 587.33, offset: 0.0, gain: 0.08, decay: 1.5 },   // D5
+        { freq: 880.00, offset: 0.07, gain: 0.06, decay: 1.8 },  // A5
+      ];
+
+      notes.forEach(({ freq, offset, gain: maxGain, decay }) => {
+        if (!ctx) return;
+        const noteStart = now + offset;
+
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, noteStart);
+
+        // Gentle, soft linear attack to avoid any clicks, followed by silky exponential decay
+        gainNode.gain.setValueAtTime(0.0001, noteStart);
+        gainNode.gain.linearRampToValueAtTime(maxGain, noteStart + 0.05);
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, noteStart + decay);
+
+        osc.connect(gainNode);
+        gainNode.connect(ctx.destination);
+
+        osc.start(noteStart);
+        osc.stop(noteStart + decay);
+      });
+    } catch {
+      // Graceful fallback
+    }
+  }
+
   // ── 10. Cosmic Ambience Engine & Track Management ─────────────
   private getActiveGenerator() {
     switch (this.activeTrackId) {
@@ -515,16 +576,47 @@ export class SoundEngine {
   }
 
   setAmbienceVolume(vol: number) {
-    this.celestialHorizon.setVolume(vol);
-    this.cosmicSanctuary.setVolume(vol);
-    this.subwooferTwilight.setVolume(vol);
-    this.miceOnOrbit.setVolume(vol);
-    this.cyberpunkRain.setVolume(vol);
-    this.binauralOdyssey.setVolume(vol);
+    const clamped = Math.max(0, Math.min(1, vol));
+    this.masterVolume = clamped;
+    this.celestialHorizon.setVolume(clamped);
+    this.cosmicSanctuary.setVolume(clamped);
+    this.subwooferTwilight.setVolume(clamped);
+    this.miceOnOrbit.setVolume(clamped);
+    this.cyberpunkRain.setVolume(clamped);
+    this.binauralOdyssey.setVolume(clamped);
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('mastery_ambient_volume', clamped.toString());
+      } catch {}
+    }
+
+    this.notifyVolumeListeners(clamped);
   }
 
   getAmbienceVolume(): number {
-    return this.getActiveGenerator().getVolume();
+    return this.masterVolume;
+  }
+
+  nextTrack(): AmbientTrackId {
+    const currentIndex = AMBIENT_TRACKS.findIndex(
+      (t) => t.id === this.activeTrackId,
+    );
+    const nextIdx = (currentIndex + 1) % AMBIENT_TRACKS.length;
+    const nextId = AMBIENT_TRACKS[nextIdx].id;
+    this.setTrack(nextId);
+    return nextId;
+  }
+
+  prevTrack(): AmbientTrackId {
+    const currentIndex = AMBIENT_TRACKS.findIndex(
+      (t) => t.id === this.activeTrackId,
+    );
+    const prevIdx =
+      (currentIndex - 1 + AMBIENT_TRACKS.length) % AMBIENT_TRACKS.length;
+    const prevId = AMBIENT_TRACKS[prevIdx].id;
+    this.setTrack(prevId);
+    return prevId;
   }
 
   subscribeAmbience(listener: (playing: boolean) => void): () => void {
@@ -541,12 +633,23 @@ export class SoundEngine {
     };
   }
 
+  subscribeVolume(listener: (volume: number) => void): () => void {
+    this.volumeListeners.add(listener);
+    return () => {
+      this.volumeListeners.delete(listener);
+    };
+  }
+
   private notifyAmbienceListeners(playing: boolean) {
     this.ambienceListeners.forEach((fn) => fn(playing));
   }
 
   private notifyTrackListeners(trackId: AmbientTrackId) {
     this.trackListeners.forEach((fn) => fn(trackId));
+  }
+
+  private notifyVolumeListeners(volume: number) {
+    this.volumeListeners.forEach((fn) => fn(volume));
   }
 }
 

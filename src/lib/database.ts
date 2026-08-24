@@ -223,6 +223,36 @@ export function createSkill(userId: string, data: NewSkillData): Skill {
   return skill;
 }
 
+export function createSkillsBatch(
+  userId: string,
+  dataList: NewSkillData[],
+): Skill[] {
+  const all = readJson<Skill[]>(STORAGE_KEYS.SKILLS, []);
+  const now = new Date().toISOString();
+  const created: Skill[] = [];
+
+  for (const data of dataList) {
+    const skill: Skill = {
+      id: generateId(),
+      userId,
+      name: data.name.trim(),
+      description: data.description.trim(),
+      category: data.category || 'generic',
+      icon: data.icon,
+      color: data.color,
+      targetHours: data.targetHours,
+      isArchived: false,
+      createdAt: now,
+      updatedAt: now,
+    };
+    all.push(skill);
+    created.push(skill);
+  }
+
+  writeJson(STORAGE_KEYS.SKILLS, all);
+  return created;
+}
+
 export function archiveSkill(userId: string, skillId: string): void {
   const all = readJson<Skill[]>(STORAGE_KEYS.SKILLS, []);
   const updated = all.map((s) =>

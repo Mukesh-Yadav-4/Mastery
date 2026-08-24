@@ -39,43 +39,43 @@ interface Cosmos3DSceneProps {
   className?: string;
 }
 
-// 3D Spatial base coordinate templates
+// 3D Spatial base coordinate templates — balanced compact constellation radius
 const SPATIAL_COORDINATES: Array<[number, number, number]> = [
-  [-4.4, 1.4, 1.8],   // 0. Foreground Left (Primary)
-  [0.0, 3.8, -1.8],   // 1. Background Top Crown
-  [4.5, 1.3, 1.7],    // 2. Foreground Right
-  [3.8, -2.4, -1.6],  // 3. Background Lower Right
-  [-3.8, -2.2, -0.6], // 4. Midground Lower Left
-  [-1.9, 3.0, 0.4],   // 5. Midground Upper Left
-  [2.2, 3.2, 0.2],    // 6. Midground Upper Right (fallback)
-  [-4.0, 0.0, -1.5],  // 7. Background Far Left (fallback)
+  [-4.7, 1.4, 1.8],   // 0. Foreground Left (Primary)
+  [0.0, 4.1, -1.8],   // 1. Background Top Crown
+  [4.8, 1.3, 1.7],    // 2. Foreground Right
+  [4.0, -2.7, -1.6],  // 3. Background Lower Right
+  [-4.0, -2.4, -0.6], // 4. Midground Lower Left
+  [-2.3, 3.6, 0.4],   // 5. Midground Upper Left
+  [2.3, 3.7, 0.2],    // 6. Midground Upper Right
+  [-4.4, -0.3, -1.5], // 7. Background Far Left
 ];
 
 function getSpatialPosition(index: number, totalCount: number): [number, number, number] {
   if (totalCount === 1) {
-    return [-4.0, 1.2, 1.6]; // Single skill: clear foreground visual focus
+    return [-4.2, 1.2, 1.6]; // Single skill: clear foreground visual focus
   }
   if (totalCount === 2) {
     const coords: Array<[number, number, number]> = [
-      [-4.2, 1.4, 1.6],
-      [4.2, -1.2, 1.2],
+      [-4.5, 1.3, 1.6],
+      [4.5, -1.1, 1.2],
     ];
     return coords[index % coords.length];
   }
   if (totalCount === 3) {
     const coords: Array<[number, number, number]> = [
-      [-4.4, 1.4, 1.6],
-      [0.0, 3.6, -1.6],
-      [4.4, -1.4, 1.4],
+      [-4.5, 1.3, 1.6],
+      [0.0, 4.1, -1.6],
+      [4.5, -1.2, 1.4],
     ];
     return coords[index % coords.length];
   }
   if (totalCount === 4) {
     const coords: Array<[number, number, number]> = [
-      [-4.4, 1.4, 1.6],
-      [0.0, 3.6, -1.6],
-      [4.4, 1.2, 1.4],
-      [3.6, -2.4, -1.4],
+      [-4.5, 1.4, 1.6],
+      [0.0, 4.1, -1.6],
+      [4.5, 1.2, 1.4],
+      [3.6, -2.6, -1.4],
     ];
     return coords[index % coords.length];
   }
@@ -523,13 +523,13 @@ export function Cosmos3DScene({
     const coreGroup = new THREE.Group();
     scene.add(coreGroup);
 
-    // Foundation starting scale is ~60% of original, evolving smoothly as journey level grows
+    // Foundation starting scale is refined & compact, evolving smoothly as journey level grows
     const safeGlobalLevel = Math.max(1, globalLevel);
-    const coreScale = Math.min(1.0, 0.60 + Math.log2(safeGlobalLevel) * 0.08);
+    const coreScale = Math.min(0.85, 0.50 + Math.log2(safeGlobalLevel) * 0.06);
     coreGroup.scale.set(coreScale, coreScale, coreScale);
 
-    // Inner Core (Personalized)
-    const innerGeo = new THREE.SphereGeometry(0.92, 48, 48);
+    // Inner Core (Refined & Compact)
+    const innerGeo = new THREE.SphereGeometry(0.70, 48, 48);
     const innerMat = new THREE.MeshStandardMaterial({
       color: new THREE.Color(initialPal.coreInner),
       emissive: new THREE.Color(initialPal.corePrimary),
@@ -540,13 +540,13 @@ export function Cosmos3DScene({
     const innerCore = new THREE.Mesh(innerGeo, innerMat);
     coreGroup.add(innerCore);
 
-    // Outer Crystal Shell (Personalized Refraction)
-    const crystalGeo = new THREE.SphereGeometry(1.62, 64, 64);
+    // Outer Crystal Shell (Refined Refraction)
+    const crystalGeo = new THREE.SphereGeometry(1.22, 64, 64);
     const crystalMat = new THREE.MeshPhysicalMaterial({
       color: new THREE.Color(initialPal.coreSecondary),
       transparent: true,
-      opacity: 0.6,
-      transmission: 0.82,
+      opacity: 0.55,
+      transmission: 0.85,
       ior: 1.45,
       roughness: 0.06,
       metalness: 0.08,
@@ -561,24 +561,24 @@ export function Cosmos3DScene({
     coreGroup.add(crystalShell);
 
     // Geodesic Accent Lattice
-    const latticeGeo = new THREE.IcosahedronGeometry(1.68, 1);
+    const latticeGeo = new THREE.IcosahedronGeometry(1.28, 1);
     const latticeMat = new THREE.MeshBasicMaterial({
       color: new THREE.Color(initialPal.accent),
       wireframe: true,
       transparent: true,
-      opacity: 0.2,
+      opacity: 0.18,
     });
     const latticeShell = new THREE.Mesh(latticeGeo, latticeMat);
     coreGroup.add(latticeShell);
 
     // Core Point Lights (Scaled to Core Size & Palette)
-    const coreLight1 = new THREE.PointLight(new THREE.Color(initialPal.aura), 4.5 * coreScale, 22 * coreScale, 1.2);
+    const coreLight1 = new THREE.PointLight(new THREE.Color(initialPal.aura), 3.5 * coreScale, 18 * coreScale, 1.2);
     coreGroup.add(coreLight1);
-    const coreLight2 = new THREE.PointLight(new THREE.Color(initialPal.accent), 3.0 * coreScale, 15 * coreScale, 1.4);
+    const coreLight2 = new THREE.PointLight(new THREE.Color(initialPal.accent), 2.5 * coreScale, 14 * coreScale, 1.4);
     coreGroup.add(coreLight2);
 
-    // 3D Concentric Metallic Orbital Rings
-    const ring1Geo = new THREE.TorusGeometry(2.5, 0.022, 24, 120);
+    // 3D Concentric Metallic Orbital Rings (Compact & Sleek)
+    const ring1Geo = new THREE.TorusGeometry(1.85, 0.015, 24, 120);
     const ring1Mat = new THREE.MeshStandardMaterial({
       color: new THREE.Color(initialPal.ring1),
       emissive: new THREE.Color(initialPal.ring1),
@@ -591,7 +591,7 @@ export function Cosmos3DScene({
     ring1.rotation.y = Math.PI / 6;
     coreGroup.add(ring1);
 
-    const ring2Geo = new THREE.TorusGeometry(3.3, 0.018, 24, 120);
+    const ring2Geo = new THREE.TorusGeometry(2.45, 0.012, 24, 120);
     const ring2Mat = new THREE.MeshStandardMaterial({
       color: new THREE.Color(initialPal.ring2),
       emissive: new THREE.Color(initialPal.ring2),
@@ -604,7 +604,7 @@ export function Cosmos3DScene({
     ring2.rotation.y = Math.PI / 4;
     coreGroup.add(ring2);
 
-    const ring3Geo = new THREE.TorusGeometry(3.65, 0.013, 24, 120);
+    const ring3Geo = new THREE.TorusGeometry(2.85, 0.010, 24, 120);
     const ring3Mat = new THREE.MeshStandardMaterial({
       color: new THREE.Color(initialPal.ring3),
       emissive: new THREE.Color(initialPal.ring3),
@@ -843,45 +843,45 @@ export function Cosmos3DScene({
           basePos.clone(),
         ]);
 
-        const coreTubeGeo = new THREE.TubeGeometry(curve, 48, 0.012, 8, false);
+        const coreTubeGeo = new THREE.TubeGeometry(curve, 48, 0.005, 8, false);
         const coreTubeMat = new THREE.MeshBasicMaterial({
           color: 0xffffff,
           transparent: true,
-          opacity: 0.85,
+          opacity: 0.25,
         });
         const coreTubeMesh = new THREE.Mesh(coreTubeGeo, coreTubeMat);
         curvesContainer.add(coreTubeMesh);
 
-        const glowTubeGeo = new THREE.TubeGeometry(curve, 48, 0.032, 8, false);
+        const glowTubeGeo = new THREE.TubeGeometry(curve, 48, 0.015, 8, false);
         const glowTubeMat = new THREE.MeshStandardMaterial({
           color: coreColor,
           emissive: coreColor,
-          emissiveIntensity: 1.5,
+          emissiveIntensity: 1.0,
           transparent: true,
-          opacity: 0.38,
+          opacity: 0.18,
         });
         const glowTubeMesh = new THREE.Mesh(glowTubeGeo, glowTubeMat);
         curvesContainer.add(glowTubeMesh);
 
         const beads: Array<{ mesh: THREE.Mesh; speed: number; offset: number }> = [];
 
-        const bead1Geo = new THREE.SphereGeometry(0.085, 12, 12);
+        const bead1Geo = new THREE.SphereGeometry(0.065, 12, 12);
         const beadMat1 = new THREE.MeshBasicMaterial({ color: 0xffffff });
         const beadMesh1 = new THREE.Mesh(bead1Geo, beadMat1);
         curvesContainer.add(beadMesh1);
-        beads.push({ mesh: beadMesh1, speed: 0.28 + (idx % 3) * 0.04, offset: 0.0 });
+        beads.push({ mesh: beadMesh1, speed: 0.145 + (idx % 3) * 0.02, offset: 0.0 });
 
-        const bead2Geo = new THREE.SphereGeometry(0.075, 10, 10);
+        const bead2Geo = new THREE.SphereGeometry(0.055, 10, 10);
         const beadMat2 = new THREE.MeshBasicMaterial({ color: 0xffffff });
         const beadMesh2 = new THREE.Mesh(bead2Geo, beadMat2);
         curvesContainer.add(beadMesh2);
-        beads.push({ mesh: beadMesh2, speed: 0.32 + (idx % 2) * 0.03, offset: 0.36 });
+        beads.push({ mesh: beadMesh2, speed: 0.160 + (idx % 2) * 0.02, offset: 0.36 });
 
-        const bead3Geo = new THREE.SphereGeometry(0.068, 10, 10);
+        const bead3Geo = new THREE.SphereGeometry(0.048, 10, 10);
         const beadMat3 = new THREE.MeshBasicMaterial({ color: 0xffffff });
         const beadMesh3 = new THREE.Mesh(bead3Geo, beadMat3);
         curvesContainer.add(beadMesh3);
-        beads.push({ mesh: beadMesh3, speed: 0.26 + (idx % 4) * 0.03, offset: 0.72 });
+        beads.push({ mesh: beadMesh3, speed: 0.135 + (idx % 4) * 0.02, offset: 0.72 });
 
         const pulseGeo = new THREE.SphereGeometry(0.15, 14, 14);
         const pulseMat = new THREE.MeshBasicMaterial({
@@ -941,9 +941,9 @@ export function Cosmos3DScene({
           phaseX: idx * 1.73 + 0.5,
           phaseY: idx * 2.41 + 1.2,
           phaseZ: idx * 1.19 + 2.1,
-          freqX: 0.65 + (idx % 3) * 0.12,
-          freqY: 0.85 + (idx % 4) * 0.10,
-          freqZ: 0.55 + (idx % 2) * 0.15,
+          freqX: 0.22 + (idx % 3) * 0.04,
+          freqY: 0.28 + (idx % 4) * 0.04,
+          freqZ: 0.18 + (idx % 2) * 0.04,
           beads,
           pulseMesh,
           surgeGroup,
@@ -1253,7 +1253,7 @@ export function Cosmos3DScene({
       }
 
       // ── Mastery Core Dynamics ────────────────────────────────────
-      coreGroup.position.y = Math.sin(elapsedTime * 1.5) * 0.22;
+      coreGroup.position.y = Math.sin(elapsedTime * 1.0) * 0.16;
 
       const extraCoreRot =
         isCinematicActive && cinematicPhase === 'core_charge'
@@ -1262,14 +1262,14 @@ export function Cosmos3DScene({
           ? (1.0 - transferRatio) * 0.08
           : 0;
 
-      crystalShell.rotation.y = elapsedTime * 0.45;
-      crystalShell.rotation.x = Math.sin(elapsedTime * 0.3) * 0.25;
-      latticeShell.rotation.y = -elapsedTime * 0.32;
-      latticeShell.rotation.z = elapsedTime * 0.2;
-      innerCore.rotation.y = -elapsedTime * 0.75 - extraCoreRot;
-      innerCore.rotation.z = elapsedTime * 0.4;
+      crystalShell.rotation.y = elapsedTime * 0.28;
+      crystalShell.rotation.x = Math.sin(elapsedTime * 0.2) * 0.15;
+      latticeShell.rotation.y = -elapsedTime * 0.18;
+      latticeShell.rotation.z = elapsedTime * 0.12;
+      innerCore.rotation.y = -elapsedTime * 0.38 - extraCoreRot;
+      innerCore.rotation.z = elapsedTime * 0.22;
 
-      const basePulseScale = 1.0 + Math.sin(elapsedTime * 2.5) * 0.08;
+      const basePulseScale = 1.0 + Math.sin(elapsedTime * 1.6) * 0.05;
       let finalCoreScale = basePulseScale;
 
       if (cinematicPhase === 'core_charge') {
@@ -1279,7 +1279,7 @@ export function Cosmos3DScene({
       }
       innerCore.scale.set(finalCoreScale, finalCoreScale, finalCoreScale);
 
-      const basePulse = 2.4 + Math.sin(elapsedTime * 2.0) * 0.9;
+      const basePulse = 2.4 + Math.sin(elapsedTime * 1.4) * 0.6;
       let feedbackCoreEmissive = 0;
       if (cinematicPhase === 'core_charge') {
         feedbackCoreEmissive =
@@ -1289,18 +1289,18 @@ export function Cosmos3DScene({
       }
       innerMat.emissiveIntensity = basePulse + feedbackCoreEmissive;
 
-      ring1.rotation.z = elapsedTime * 0.55 + extraCoreRot * 1.5;
-      ring1.rotation.y = Math.PI / 6 + Math.sin(elapsedTime * 0.6) * 0.15;
+      ring1.rotation.z = elapsedTime * 0.32 + extraCoreRot * 1.5;
+      ring1.rotation.y = Math.PI / 6 + Math.sin(elapsedTime * 0.35) * 0.1;
 
-      ring2.rotation.z = -elapsedTime * 0.42 - extraCoreRot * 1.5;
-      ring2.rotation.x = -Math.PI / 4 + Math.cos(elapsedTime * 0.5) * 0.15;
+      ring2.rotation.z = -elapsedTime * 0.25 - extraCoreRot * 1.5;
+      ring2.rotation.x = -Math.PI / 4 + Math.cos(elapsedTime * 0.3) * 0.1;
 
-      ring3.rotation.y = elapsedTime * 0.32;
-      ring3.rotation.z = -Math.PI / 3 + Math.sin(elapsedTime * 0.4) * 0.15;
+      ring3.rotation.y = elapsedTime * 0.20;
+      ring3.rotation.z = -Math.PI / 3 + Math.sin(elapsedTime * 0.25) * 0.1;
 
-      starField.rotation.y = elapsedTime * 0.035;
-      deepStarField.rotation.y = -elapsedTime * 0.02;
-      distantPlanetGroup.position.y = -9.5 + Math.sin(elapsedTime * 0.5) * 0.35;
+      starField.rotation.y = elapsedTime * 0.022;
+      deepStarField.rotation.y = -elapsedTime * 0.012;
+      distantPlanetGroup.position.y = -9.5 + Math.sin(elapsedTime * 0.35) * 0.25;
 
       // ── Asynchronous Node Drift & Selection Visual Feedback ───────
       const liveWidth = container.clientWidth || 800;
@@ -1341,7 +1341,7 @@ export function Cosmos3DScene({
           bead.mesh.position.copy(pt);
 
           const scalePulse =
-            0.95 + Math.sin(elapsedTime * 8.0 + bead.offset * 12) * 0.3;
+            0.95 + Math.sin(elapsedTime * 3.5 + bead.offset * 8) * 0.2;
           bead.mesh.scale.set(scalePulse, scalePulse, scalePulse);
         });
 
@@ -1588,26 +1588,32 @@ export function Cosmos3DScene({
             }}
           >
             <div className="relative flex flex-col items-center">
-              {/* Hitbox Area */}
-              <div className="w-16 h-16 rounded-full -mb-2" />
+              {/* Hitbox Area (Generous clickable / hoverable area around sphere) */}
+              <div className="w-16 h-16 rounded-full -mb-1" />
 
-              {/* Holographic Label Capsule */}
+              {/* Minimalist Ethereal Label (Expands on Hover / Selection) */}
               <div
                 className={cn(
-                  'px-2.5 py-1 rounded-xl flex items-center gap-1.5',
-                  'bg-surface/90 border backdrop-blur-md shadow-xl transition-all duration-300',
+                  'flex items-center gap-1.5 transition-all duration-250 select-none',
                   isSelected
-                    ? 'border-accent/90 text-zinc-50 shadow-[0_0_18px_rgba(129,140,248,0.6)] ring-1 ring-accent/60 scale-105'
-                    : 'border-edge/70 text-zinc-200 hover:border-zinc-300 hover:text-white',
+                    ? 'px-2.5 py-1 rounded-xl bg-surface/95 border border-accent/90 text-zinc-50 shadow-[0_0_20px_rgba(129,140,248,0.6)] ring-1 ring-accent/60 scale-105 backdrop-blur-xl'
+                    : 'px-2 py-0.5 rounded-full bg-black/45 border border-white/10 text-zinc-300 backdrop-blur-md hover:bg-surface/90 hover:border-white/30 hover:text-white hover:scale-105 shadow-md',
                 )}
               >
-                <span className="text-sm">{node.icon}</span>
-                <span className="text-xs font-bold tracking-tight truncate max-w-[100px] sm:max-w-[130px]">
+                <span className="text-xs leading-none drop-shadow-sm">{node.icon}</span>
+                <span className="text-[11px] font-semibold tracking-tight truncate max-w-[95px] sm:max-w-[125px] drop-shadow-sm">
                   {node.name}
                 </span>
+
+                {/* Stage Badge only on Selected State (or Group Hover) */}
                 {stageName && (
                   <span
-                    className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase tracking-wider bg-canvas/80 border border-edge/60 text-zinc-300"
+                    className={cn(
+                      'px-1.5 py-0.2 rounded text-[8px] font-black uppercase tracking-wider transition-all',
+                      isSelected
+                        ? 'inline-block bg-canvas/90 border border-edge/80'
+                        : 'hidden group-hover:inline-block bg-black/70 border border-white/15',
+                    )}
                     style={{ color: node.color }}
                   >
                     {stageName}

@@ -142,15 +142,15 @@ export function SkillJourneyPanel({
         ref={panelRef}
         onPointerDown={(e) => e.stopPropagation()}
         style={{
-          background: `radial-gradient(ellipse at 20% 0%, ${node.color}18 0%, transparent 65%), rgba(7, 10, 22, 0.82)`,
-          boxShadow: `0 20px 48px -10px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.08), 0 0 28px -4px ${node.color}25, inset 0 1px 1px 0 rgba(255, 255, 255, 0.16)`,
+          background: `radial-gradient(ellipse at 20% 0%, ${node.color}18 0%, transparent 65%), rgba(7, 10, 22, 0.88)`,
+          boxShadow: `0 24px 56px -10px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.1), 0 0 32px -4px ${node.color}30, inset 0 1px 1px 0 rgba(255, 255, 255, 0.18)`,
         }}
         className={cn(
-          // Desktop & Tablet: Floating Holographic Window on the left, below YOUR JOURNEY HUD
-          'md:absolute md:left-3 sm:md:left-4 md:top-[128px] md:w-[310px] lg:w-[330px] md:max-h-[min(460px,calc(100dvh-128px-72px))] md:z-40',
+          // Desktop & Tablet: Elongated Floating Holographic Window on the left, below YOUR JOURNEY HUD
+          'md:absolute md:left-3 sm:md:left-4 md:top-[128px] md:w-[350px] lg:w-[370px] md:max-h-[min(580px,calc(100dvh-128px-36px))] md:z-40',
           'md:rounded-3xl md:backdrop-blur-2xl',
           // Mobile Fixed Bottom Sheet
-          'fixed inset-x-0 bottom-0 z-50 max-h-[82dvh] rounded-t-3xl border-t border-white/10 backdrop-blur-2xl p-4 sm:p-5 md:p-4',
+          'fixed inset-x-0 bottom-0 z-50 max-h-[85dvh] rounded-t-3xl border-t border-white/10 backdrop-blur-2xl p-4 sm:p-5 md:p-4.5',
           'flex flex-col justify-between overflow-y-auto select-none transition-all duration-300 ease-out animate-scale-in',
           className,
         )}
@@ -337,8 +337,7 @@ export function SkillJourneyPanel({
                 <div className="space-y-1 pt-0.5">
                   <div className="flex items-center justify-between text-[9px] text-zinc-400 tabular-nums">
                     <span>
-                      {totalHours.toFixed(1)}h /{' '}
-                      {stageMax >= 10000 ? '1,200h+' : `${stageMax}h`}
+                      {totalHours.toFixed(1)}h / {stageMax}h
                     </span>
                     <span className="text-zinc-200 font-semibold">
                       {Math.round(stageProgressPercent)}%
@@ -387,10 +386,9 @@ export function SkillJourneyPanel({
                   </span>
                 </div>
 
-                <div className="max-h-[110px] overflow-y-auto pr-1 pl-4 relative space-y-2 before:absolute before:left-1.5 before:top-1.5 before:bottom-1.5 before:w-0.5 before:bg-white/10">
+                <div className="max-h-[220px] overflow-y-auto pr-1.5 pl-4 relative space-y-2.5 before:absolute before:left-1.5 before:top-1.5 before:bottom-1.5 before:w-0.5 before:bg-white/10">
                   {profile.stages.map((stg) => {
-                    const isCompleted =
-                      totalHours >= stg.maxHours && stg.maxHours < 10000;
+                    const isCompleted = totalHours >= stg.maxHours;
                     const isCurrent = currentStage.id === stg.id;
 
                     return (
@@ -435,9 +433,8 @@ export function SkillJourneyPanel({
                           {stg.name}
                         </span>
 
-                        <span className="text-[10px] text-zinc-500 font-semibold tabular-nums flex-shrink-0">
-                          {stg.minHours}–
-                          {stg.maxHours >= 10000 ? '1,200h+' : `${stg.maxHours}h`}
+                        <span className="text-[10px] text-zinc-400 font-semibold tabular-nums flex-shrink-0">
+                          {stg.minHours}–{stg.maxHours}h
                         </span>
                       </div>
                     );

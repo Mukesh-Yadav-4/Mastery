@@ -76,6 +76,7 @@ interface AppContextValue {
 
   // Skills
   createSkill: (data: NewSkillData) => void;
+  createSkillsBatch: (dataList: NewSkillData[]) => void;
   updateSkillCategory: (skillId: string, category: SkillCategory) => void;
   archiveSkill: (skillId: string) => void;
   deleteSkill: (skillId: string) => void;
@@ -343,7 +344,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
         )
       : null;
 
-    const xpBreakdown = getSessionXPBreakdown(durationSeconds, 'completed');
+    const hasIntention = Boolean(
+      activeTimer.intention && activeTimer.intention.trim().length > 0,
+    );
+    const hasReflection = Boolean(
+      reflection &&
+        ((reflection.notes && reflection.notes.trim().length > 0) ||
+          (reflection.friction && reflection.friction.trim().length > 0) ||
+          reflection.qualityRating),
+    );
+
+    const xpBreakdown = getSessionXPBreakdown(durationSeconds, 'completed', {
+      hasIntention,
+      hasReflection,
+      streakDays: streak.currentStreak,
+    });
 
     if (skill && preProgression && postProgression) {
       // Detect Horizon and Stage transitions
@@ -376,6 +391,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         xpEarned: xpBreakdown.totalXP,
         baseXP: xpBreakdown.baseXP,
         bonusXP: xpBreakdown.bonusXP,
+        intentionBonus: xpBreakdown.intentionBonus,
+        reflectionBonus: xpBreakdown.reflectionBonus,
+        streakBonus: xpBreakdown.streakBonus,
         previousSeconds: preSkillSeconds,
         newSeconds: postSkillSeconds,
         previousHours: preSkillHours,
@@ -406,6 +424,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         earnedXP: xpBreakdown.totalXP,
         baseXP: xpBreakdown.baseXP,
         bonusXP: xpBreakdown.bonusXP,
+        intentionBonus: xpBreakdown.intentionBonus,
+        reflectionBonus: xpBreakdown.reflectionBonus,
+        streakBonus: xpBreakdown.streakBonus,
         previousLevelInfo: preGlobalLevel,
         newLevelInfo: postGlobalLevel,
         didLevelUp: postGlobalLevel.level > preGlobalLevel.level,
@@ -443,7 +464,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     db.saveTimerState(null);
     loadData();
     setActiveView('dashboard');
-  }, [user, activeTimer, skills, loadData, setActiveView]);
+  }, [user, activeTimer, skills, streak, loadData, setActiveView]);
 
   const cancelTimer = useCallback(() => {
     setActiveTimer(null);
@@ -457,6 +478,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     (data: NewSkillData) => {
       if (!user) return;
       db.createSkill(user.id, data);
+      loadData();
+    },
+    [user, loadData],
+  );
+
+  const handleCreateSkillsBatch = useCallback(
+    (dataList: NewSkillData[]) => {
+      if (!user) return;
+      db.createSkillsBatch(user.id, dataList);
       loadData();
     },
     [user, loadData],
@@ -565,7 +595,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         skill.targetHours,
       );
 
-      const xpBreakdown = getSessionXPBreakdown(durationSeconds, 'completed');
+      const xpBreakdown = getSessionXPBreakdown(durationSeconds, 'completed', {
+        hasIntention: true,
+        hasReflection: true,
+        streakDays: streak.currentStreak,
+      });
 
       const crossedHorizon =
         postProgression.structureTier > preProgression.structureTier ||
@@ -596,6 +630,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         xpEarned: xpBreakdown.totalXP,
         baseXP: xpBreakdown.baseXP,
         bonusXP: xpBreakdown.bonusXP,
+        intentionBonus: xpBreakdown.intentionBonus,
+        reflectionBonus: xpBreakdown.reflectionBonus,
+        streakBonus: xpBreakdown.streakBonus,
         previousSeconds: preSkillSeconds,
         newSeconds: postSkillSeconds,
         previousHours: preSkillHours,
@@ -619,7 +656,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setSessions(updatedSessions);
       setActiveView('dashboard');
     },
-    [user, skills],
+    [user, skills, streak],
   );
 
   const isDevPreview = Boolean(
@@ -658,6 +695,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         completeTimer,
         cancelTimer,
         createSkill: handleCreateSkill,
+        createSkillsBatch: handleCreateSkillsBatch,
         updateSkillCategory: handleUpdateSkillCategory,
         archiveSkill: handleArchiveSkill,
         deleteSkill: handleDeleteSkill,

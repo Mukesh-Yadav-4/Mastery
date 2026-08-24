@@ -21,38 +21,138 @@ describe('XP & Level Progression Engine', () => {
 
     it('applies exact completion bonus thresholds for completed sessions', () => {
       // 10-14 min -> +0 bonus
-      expect(getSessionXPBreakdown(10 * 60)).toEqual({ baseXP: 10, bonusXP: 0, totalXP: 10 });
-      expect(getSessionXPBreakdown(14 * 60)).toEqual({ baseXP: 14, bonusXP: 0, totalXP: 14 });
+      expect(getSessionXPBreakdown(10 * 60)).toEqual({
+        baseXP: 10,
+        bonusXP: 0,
+        intentionBonus: 0,
+        reflectionBonus: 0,
+        streakBonus: 0,
+        totalXP: 10,
+      });
+      expect(getSessionXPBreakdown(14 * 60)).toEqual({
+        baseXP: 14,
+        bonusXP: 0,
+        intentionBonus: 0,
+        reflectionBonus: 0,
+        streakBonus: 0,
+        totalXP: 14,
+      });
 
       // 15-29 min -> +2 bonus
-      expect(getSessionXPBreakdown(15 * 60)).toEqual({ baseXP: 15, bonusXP: 2, totalXP: 17 });
-      expect(getSessionXPBreakdown(25 * 60)).toEqual({ baseXP: 25, bonusXP: 2, totalXP: 27 });
+      expect(getSessionXPBreakdown(15 * 60)).toEqual({
+        baseXP: 15,
+        bonusXP: 2,
+        intentionBonus: 0,
+        reflectionBonus: 0,
+        streakBonus: 0,
+        totalXP: 17,
+      });
+      expect(getSessionXPBreakdown(25 * 60)).toEqual({
+        baseXP: 25,
+        bonusXP: 2,
+        intentionBonus: 0,
+        reflectionBonus: 0,
+        streakBonus: 0,
+        totalXP: 27,
+      });
 
       // 30-44 min -> +4 bonus
-      expect(getSessionXPBreakdown(30 * 60)).toEqual({ baseXP: 30, bonusXP: 4, totalXP: 34 });
-      expect(getSessionXPBreakdown(40 * 60)).toEqual({ baseXP: 40, bonusXP: 4, totalXP: 44 });
+      expect(getSessionXPBreakdown(30 * 60)).toEqual({
+        baseXP: 30,
+        bonusXP: 4,
+        intentionBonus: 0,
+        reflectionBonus: 0,
+        streakBonus: 0,
+        totalXP: 34,
+      });
+      expect(getSessionXPBreakdown(40 * 60)).toEqual({
+        baseXP: 40,
+        bonusXP: 4,
+        intentionBonus: 0,
+        reflectionBonus: 0,
+        streakBonus: 0,
+        totalXP: 44,
+      });
 
       // 45-59 min -> +6 bonus (45m -> 51 XP)
-      expect(getSessionXPBreakdown(45 * 60)).toEqual({ baseXP: 45, bonusXP: 6, totalXP: 51 });
+      expect(getSessionXPBreakdown(45 * 60)).toEqual({
+        baseXP: 45,
+        bonusXP: 6,
+        intentionBonus: 0,
+        reflectionBonus: 0,
+        streakBonus: 0,
+        totalXP: 51,
+      });
       expect(calculateSessionXP(45 * 60)).toBe(51);
 
       // 60-89 min -> +8 bonus (60m -> 68 XP)
-      expect(getSessionXPBreakdown(60 * 60)).toEqual({ baseXP: 60, bonusXP: 8, totalXP: 68 });
+      expect(getSessionXPBreakdown(60 * 60)).toEqual({
+        baseXP: 60,
+        bonusXP: 8,
+        intentionBonus: 0,
+        reflectionBonus: 0,
+        streakBonus: 0,
+        totalXP: 68,
+      });
       expect(calculateSessionXP(60 * 60)).toBe(68);
 
       // 90-119 min -> +12 bonus (90m -> 102 XP)
-      expect(getSessionXPBreakdown(90 * 60)).toEqual({ baseXP: 90, bonusXP: 12, totalXP: 102 });
+      expect(getSessionXPBreakdown(90 * 60)).toEqual({
+        baseXP: 90,
+        bonusXP: 12,
+        intentionBonus: 0,
+        reflectionBonus: 0,
+        streakBonus: 0,
+        totalXP: 102,
+      });
       expect(calculateSessionXP(90 * 60)).toBe(102);
 
       // 120+ min -> +15 bonus (120m -> 135 XP)
-      expect(getSessionXPBreakdown(120 * 60)).toEqual({ baseXP: 120, bonusXP: 15, totalXP: 135 });
+      expect(getSessionXPBreakdown(120 * 60)).toEqual({
+        baseXP: 120,
+        bonusXP: 15,
+        intentionBonus: 0,
+        reflectionBonus: 0,
+        streakBonus: 0,
+        totalXP: 135,
+      });
       expect(calculateSessionXP(120 * 60)).toBe(135);
     });
+
+    it('awards deliberate intention and reflection bonuses', () => {
+      // 25m Pomodoro with intention (+5) and reflection (+5)
+      const res = getSessionXPBreakdown(25 * 60, 'completed', {
+        hasIntention: true,
+        hasReflection: true,
+      });
+      expect(res).toEqual({
+        baseXP: 25,
+        bonusXP: 2,
+        intentionBonus: 5,
+        reflectionBonus: 5,
+        streakBonus: 0,
+        totalXP: 37,
+      });
+    });
+
+    it('applies daily streak momentum bonuses', () => {
+      // 7-day streak (+10% on 30m session = +3 XP)
+      const res = getSessionXPBreakdown(30 * 60, 'completed', {
+        streakDays: 7,
+      });
+      expect(res.streakBonus).toBe(3);
+      expect(res.totalXP).toBe(30 + 4 + 3); // 37 XP
+    });
+
+
 
     it('does NOT award completion bonus for cancelled or abandoned sessions', () => {
       expect(getSessionXPBreakdown(60 * 60, 'cancelled')).toEqual({
         baseXP: 60,
         bonusXP: 0,
+        intentionBonus: 0,
+        reflectionBonus: 0,
+        streakBonus: 0,
         totalXP: 60,
       });
       expect(calculateSessionXP(45 * 60, 'cancelled')).toBe(45);

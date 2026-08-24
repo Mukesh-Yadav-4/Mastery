@@ -7,6 +7,7 @@ import { AppShell } from './components/layout/AppShell';
 import { Dashboard } from './components/dashboard/Dashboard';
 import { FocusTimer } from './components/focus/FocusTimer';
 import { SessionHistory } from './components/sessions/SessionHistory';
+import { Analytics } from './components/analytics/Analytics';
 import { Settings } from './components/settings/Settings';
 import { MilestoneCelebration } from './components/milestones/MilestoneCelebration';
 import { SessionCompletionModal } from './components/sessions/SessionCompletionModal';
@@ -213,6 +214,8 @@ function ViewRouter({ activeView }: { activeView: string }) {
       return <Dashboard />;
     case 'history':
       return <SessionHistory />;
+    case 'analytics':
+      return <Analytics />;
     case 'settings':
       return <Settings />;
     default:
