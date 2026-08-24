@@ -525,7 +525,7 @@ export function Cosmos3DScene({
     ring2.rotation.y = Math.PI / 4;
     coreGroup.add(ring2);
 
-    const ring3Geo = new THREE.TorusGeometry(4.2, 0.014, 24, 120);
+    const ring3Geo = new THREE.TorusGeometry(3.65, 0.013, 24, 120);
     const ring3Mat = new THREE.MeshStandardMaterial({
       color: new THREE.Color(initialPal.ring3),
       emissive: new THREE.Color(initialPal.ring3),
