@@ -1,11 +1,22 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Button } from '../ui/Button';
 import { cn } from '../../lib/utils';
 import { formatTimerDisplay, formatHoursMinutes } from '../../utils/calculations';
 import { MIN_SESSION_DURATION_SECONDS } from '../../lib/constants';
-import { Pause, Play, CheckCircle2, X, Sparkles } from 'lucide-react';
+import {
+  Pause,
+  Play,
+  CheckCircle2,
+  X,
+  Sparkles,
+  Target,
+  Edit2,
+  Clock,
+} from 'lucide-react';
 import { soundEngine } from '../../utils/audio';
+import { SessionReflectionModal } from '../sessions/SessionReflectionModal';
+import type { SessionReflection } from '../../types';
 
 export function FocusTimer() {
   const {
@@ -15,6 +26,7 @@ export function FocusTimer() {
     pauseTimer,
     resumeTimer,
     completeTimer,
+    updateTimerIntention,
     cancelTimer,
   } = useApp();
 
@@ -30,7 +42,8 @@ export function FocusTimer() {
       effectiveEnd = activeTimer.pausedAt;
     }
 
-    const totalMs = effectiveEnd - activeTimer.startedAt - activeTimer.totalPausedMs;
+    const totalMs =
+      effectiveEnd - activeTimer.startedAt - activeTimer.totalPausedMs;
     return Math.max(0, Math.floor(totalMs / 1000));
   }, [activeTimer]);
 
@@ -45,7 +58,12 @@ export function FocusTimer() {
       effectiveEnd - activeTimer.startedAt - activeTimer.totalPausedMs;
     return Math.max(0, Math.floor(totalMs / 1000));
   });
+
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [showReflectionModal, setShowReflectionModal] = useState(false);
+  const [isEditingIntention, setIsEditingIntention] = useState(false);
+  const [editedIntention, setEditedIntention] = useState('');
+  const editInputRef = useRef<HTMLInputElement | null>(null);
 
   // Update elapsed display
   useEffect(() => {
@@ -71,6 +89,12 @@ export function FocusTimer() {
       document.removeEventListener('visibilitychange', handleVisibility);
   }, [getElapsedSeconds]);
 
+  useEffect(() => {
+    if (activeTimer?.intention) {
+      setEditedIntention(activeTimer.intention);
+    }
+  }, [activeTimer?.intention]);
+
   if (!activeTimer) return null;
 
   const skill = skills.find((s) => s.id === activeTimer.skillId);
@@ -83,12 +107,15 @@ export function FocusTimer() {
   const isRunning = activeTimer.status === 'running';
   const isPaused = activeTimer.status === 'paused';
   const canComplete = elapsed >= MIN_SESSION_DURATION_SECONDS;
+  const targetDuration = activeTimer.targetDurationSeconds ?? null;
 
   // Calculate projected session progress ratio
   const currentTotalSeconds = progress?.totalSeconds ?? 0;
   const projectedTotalSeconds = currentTotalSeconds + elapsed;
   const projectedPercentage = Math.min(
-    skill.targetHours > 0 ? (projectedTotalSeconds / (skill.targetHours * 3600)) * 100 : 0,
+    skill.targetHours > 0
+      ? (projectedTotalSeconds / (skill.targetHours * 3600)) * 100
+      : 0,
     100,
   );
 
@@ -97,17 +124,38 @@ export function FocusTimer() {
     resumeTimer();
   };
 
-  const handleComplete = () => {
+  const handleCompleteClick = () => {
     soundEngine.playChime();
+    setShowReflectionModal(true);
+  };
+
+  const handleCommitReflection = (reflection: SessionReflection) => {
+    setShowReflectionModal(false);
+    completeTimer(reflection);
+  };
+
+  const handleSkipReflection = () => {
+    setShowReflectionModal(false);
     completeTimer();
+  };
+
+  const handleSaveEditedIntention = () => {
+    updateTimerIntention(editedIntention);
+    setIsEditingIntention(false);
   };
 
   // Ring circumference calculation (radius = 110)
   const radius = 110;
   const circumference = 2 * Math.PI * radius;
-  // Visual session cycle ring (loops gracefully every hour or displays target %)
-  const sessionCycleProgress = (elapsed % 3600) / 3600;
-  const strokeDashoffset = circumference - sessionCycleProgress * circumference;
+
+  // Progress calculations:
+  // If target duration is set, progress fills to 100% of target.
+  // If open flow, progress loops gracefully every hour (3600s).
+  let ringProgress = (elapsed % 3600) / 3600;
+  if (targetDuration && targetDuration > 0) {
+    ringProgress = Math.min(1.0, elapsed / targetDuration);
+  }
+  const strokeDashoffset = circumference - ringProgress * circumference;
 
   return (
     <div className="fixed inset-0 z-50 bg-[#060813] select-none flex flex-col items-center justify-between p-6 sm:p-8 overflow-hidden animate-fade-in">
@@ -151,7 +199,7 @@ export function FocusTimer() {
               <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
             </div>
             <p className="text-[11px] text-zinc-400 font-medium">
-              Focused Practice
+              Deliberate Practice Chamber
             </p>
           </div>
         </div>
@@ -169,7 +217,60 @@ export function FocusTimer() {
       </header>
 
       {/* ── 3. Central Focus Chamber (Temporal Energy Ring) ────── */}
-      <main className="flex flex-col items-center justify-center my-auto space-y-6">
+      <main className="flex flex-col items-center justify-center my-auto space-y-5">
+        {/* Holographic Deliberate Intention Pill */}
+        <div className="max-w-xs sm:max-w-md text-center">
+          {isEditingIntention ? (
+            <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-black/60 border border-accent/50 shadow-lg">
+              <input
+                ref={editInputRef}
+                type="text"
+                value={editedIntention}
+                onChange={(e) => setEditedIntention(e.target.value)}
+                placeholder="Edit practice target..."
+                maxLength={100}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSaveEditedIntention();
+                  else if (e.key === 'Escape') setIsEditingIntention(false);
+                }}
+                className="px-3 py-1 bg-transparent text-xs text-zinc-100 placeholder:text-zinc-500 focus:outline-none flex-1"
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={handleSaveEditedIntention}
+                className="px-2.5 py-1 rounded-xl bg-accent text-white text-[10px] font-bold cursor-pointer"
+              >
+                Save
+              </button>
+            </div>
+          ) : activeTimer.intention ? (
+            <div
+              onClick={() => setIsEditingIntention(true)}
+              className="group inline-flex items-center gap-2 px-3.5 py-1.5 rounded-2xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 hover:border-white/20 transition-all cursor-pointer shadow-lg backdrop-blur-xl"
+              title="Click to edit intention"
+            >
+              <Target size={13} className="text-accent flex-shrink-0" />
+              <span className="text-xs font-semibold text-zinc-200 truncate max-w-[220px] sm:max-w-[320px]">
+                {activeTimer.intention}
+              </span>
+              <Edit2
+                size={11}
+                className="text-zinc-500 group-hover:text-zinc-300 opacity-0 group-hover:opacity-100 transition-opacity"
+              />
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setIsEditingIntention(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/[0.02] hover:bg-white/[0.06] border border-dashed border-white/15 text-[11px] font-medium text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+            >
+              <Target size={12} className="text-zinc-500" />
+              <span>+ Add deliberate target</span>
+            </button>
+          )}
+        </div>
+
         {/* Temporal Ring Viewport */}
         <div className="relative flex items-center justify-center">
           {/* Outer Faint Ambient Orbit Ring */}
@@ -184,7 +285,10 @@ export function FocusTimer() {
           />
 
           {/* SVG Progress Ring */}
-          <svg className="w-[260px] h-[260px] -rotate-90 transform" viewBox="0 0 240 240">
+          <svg
+            className="w-[260px] h-[260px] -rotate-90 transform"
+            viewBox="0 0 240 240"
+          >
             {/* Background Track Ring */}
             <circle
               cx="120"
@@ -217,22 +321,31 @@ export function FocusTimer() {
             <span
               className={cn(
                 'font-extrabold tabular-nums tracking-tighter text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.2)]',
-                elapsed >= 3600 ? 'text-4xl sm:text-5xl' : 'text-5xl sm:text-6xl',
+                elapsed >= 3600
+                  ? 'text-4xl sm:text-5xl'
+                  : 'text-5xl sm:text-6xl',
               )}
             >
               {formatTimerDisplay(elapsed)}
             </span>
 
-            {/* State Indicator */}
+            {/* State Indicator & Target Duration */}
             <div className="mt-2 flex items-center gap-1.5">
               {isPaused ? (
                 <span className="text-[10px] font-bold uppercase tracking-widest text-amber-400 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-full animate-pulse">
                   Paused
                 </span>
+              ) : targetDuration ? (
+                <span className="text-[10px] font-bold uppercase tracking-widest text-cyan-300 bg-cyan-500/10 border border-cyan-500/25 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                  <Clock size={10} className="animate-spin-slow" />
+                  <span>
+                    {Math.round(ringProgress * 100)}% of {Math.round(targetDuration / 60)}m
+                  </span>
+                </span>
               ) : (
-                <span className="text-[10px] font-bold uppercase tracking-widest text-accent/90 bg-accent/10 border border-accent/25 px-2 py-0.5 rounded-full flex items-center gap-1">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-accent/90 bg-accent/10 border border-accent/25 px-2.5 py-0.5 rounded-full flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-accent animate-ping" />
-                  <span>Deep Focus</span>
+                  <span>Deep Flow</span>
                 </span>
               )}
             </div>
@@ -254,7 +367,9 @@ export function FocusTimer() {
               Target Milestone
             </span>
             <span className="text-xs font-bold text-zinc-200 tabular-nums">
-              {skill.targetHours > 0 ? `${projectedPercentage.toFixed(0)}% reached` : 'Continuous'}
+              {skill.targetHours > 0
+                ? `${projectedPercentage.toFixed(0)}% reached`
+                : 'Continuous'}
             </span>
           </div>
         </div>
@@ -294,7 +409,7 @@ export function FocusTimer() {
           <Button
             variant="primary"
             size="lg"
-            onClick={handleComplete}
+            onClick={handleCompleteClick}
             disabled={!canComplete}
             className={cn(
               'flex-1 h-12 rounded-2xl font-bold gap-2 text-xs shadow-[0_0_24px_rgba(129,140,248,0.4)]',
@@ -314,7 +429,17 @@ export function FocusTimer() {
         </p>
       </footer>
 
-      {/* ── 6. Discard Session Confirmation Dialog ─────────────── */}
+      {/* ── 6. Reflection Modal on Completion ──────────────────── */}
+      <SessionReflectionModal
+        open={showReflectionModal}
+        skill={skill}
+        durationSeconds={elapsed}
+        initialIntention={activeTimer.intention}
+        onComplete={handleCommitReflection}
+        onSkip={handleSkipReflection}
+      />
+
+      {/* ── 7. Discard Session Confirmation Dialog ─────────────── */}
       {showCancelConfirm && (
         <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
           <div
@@ -327,7 +452,8 @@ export function FocusTimer() {
                 Discard this session?
               </h3>
               <p className="text-xs text-zinc-400">
-                {formatTimerDisplay(elapsed)} of deliberate practice will not be saved to your Cosmos.
+                {formatTimerDisplay(elapsed)} of deliberate practice will not be
+                saved to your Cosmos.
               </p>
             </div>
             <div className="flex gap-2 pt-1">

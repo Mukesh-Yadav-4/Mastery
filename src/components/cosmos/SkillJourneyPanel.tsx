@@ -15,6 +15,7 @@ import {
   Layers,
   Trash2,
   ChevronDown,
+  Target,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -40,11 +41,14 @@ export function SkillJourneyPanel({
   onStartFocus,
   className,
 }: SkillJourneyPanelProps) {
-  const { deleteSkill, updateSkillCategory } = useApp();
+  const { deleteSkill, updateSkillCategory, sessions } = useApp();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showCategoryMenu, setShowCategoryMenu] = useState(false);
+  const [activeTab, setActiveTab] = useState<'roadmap' | 'journal'>('roadmap');
   const panelRef = useRef<HTMLElement>(null);
   const categoryMenuRef = useRef<HTMLDivElement>(null);
+
+  const skillSessions = sessions.filter((s) => s.skillId === node.id);
 
   const progression = node.progression;
   const currentCategory = (progression?.category as SkillCategory) || 'generic';
@@ -273,134 +277,237 @@ export function SkillJourneyPanel({
             )}
           </div>
 
-          {/* ── 3. Current Stage & Next Horizon ─────────────────── */}
-          <div className="rounded-2xl bg-white/[0.04] border border-white/[0.08] p-3 space-y-2 shadow-inner">
-            <div className="flex items-center justify-between">
-              <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1">
-                <Layers size={11} className="text-accent" />
-                Current Stage
+          {/* ── 3. Tab Switch: Roadmap vs Practice Journal ────── */}
+          <div className="flex items-center gap-1 p-0.5 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+            <button
+              type="button"
+              onClick={() => setActiveTab('roadmap')}
+              className={cn(
+                'flex-1 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer text-center',
+                activeTab === 'roadmap'
+                  ? 'bg-accent/20 text-accent border border-accent/40 shadow-xs'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]',
+              )}
+            >
+              Roadmap
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('journal')}
+              className={cn(
+                'flex-1 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer text-center flex items-center justify-center gap-1',
+                activeTab === 'journal'
+                  ? 'bg-accent/20 text-accent border border-accent/40 shadow-xs'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]',
+              )}
+            >
+              <span>Journal</span>
+              <span className="px-1 py-0.2 rounded-full bg-black/40 text-[9px] font-bold text-zinc-300">
+                {skillSessions.length}
               </span>
-              <span
-                className="px-2 py-0.2 rounded text-[9px] font-black uppercase tracking-wider border shadow-xs"
-                style={{
-                  backgroundColor: `${node.color}20`,
-                  borderColor: `${node.color}50`,
-                  color: node.color,
-                }}
-              >
-                {currentStage.name}
-              </span>
-            </div>
-
-            {/* Description only for current stage */}
-            <p className="text-[11px] text-zinc-300 leading-snug">
-              {currentStage.description}
-            </p>
-
-            {/* Stage Progress Bar */}
-            <div className="space-y-1 pt-0.5">
-              <div className="flex items-center justify-between text-[9px] text-zinc-400 tabular-nums">
-                <span>
-                  {totalHours.toFixed(1)}h / {stageMax >= 10000 ? '1,200h+' : `${stageMax}h`}
-                </span>
-                <span className="text-zinc-200 font-semibold">
-                  {Math.round(stageProgressPercent)}%
-                </span>
-              </div>
-
-              <div className="w-full h-1.5 rounded-full bg-black/40 border border-white/[0.06] overflow-hidden relative">
-                <div
-                  className="h-full rounded-full transition-all duration-700"
-                  style={{
-                    width: `${stageProgressPercent}%`,
-                    backgroundColor: node.color,
-                    boxShadow: `0 0 12px ${node.color}90`,
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Next Horizon Checkpoint */}
-            {nextHorizon ? (
-              <div className="pt-1.5 border-t border-white/[0.06] flex items-center justify-between text-[11px]">
-                <div className="flex items-center gap-1 text-zinc-300">
-                  <Compass size={12} className="text-cyan-400 flex-shrink-0" />
-                  <span className="font-bold">Next: {nextHorizon}h</span>
-                </div>
-                {typeof hoursRemaining === 'number' && hoursRemaining > 0 && (
-                  <span className="text-[10px] text-zinc-400 tabular-nums">
-                    {hoursRemaining.toFixed(1)}h away
-                  </span>
-                )}
-              </div>
-            ) : (
-              <div className="pt-1.5 border-t border-white/[0.06] flex items-center gap-1 text-[11px] text-zinc-300">
-                <Sparkles size={12} className="text-amber-400" />
-                <span className="font-bold">Journey Milestone Reached</span>
-              </div>
-            )}
+            </button>
           </div>
 
-          {/* ── 4. Compact Growth Path Track (Internally Scrollable) ─ */}
-          <div className="space-y-1.5 pt-0.5">
-            <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-wider text-zinc-500">
-              <span>Growth Path</span>
-              <span className="font-normal text-zinc-500 truncate max-w-[140px]">
-                {profile.title}
-              </span>
-            </div>
+          {activeTab === 'roadmap' ? (
+            <>
+              {/* ── Current Stage & Next Horizon ─────────────────── */}
+              <div className="rounded-2xl bg-white/[0.04] border border-white/[0.08] p-3 space-y-2 shadow-inner">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1">
+                    <Layers size={11} className="text-accent" />
+                    Current Stage
+                  </span>
+                  <span
+                    className="px-2 py-0.2 rounded text-[9px] font-black uppercase tracking-wider border shadow-xs"
+                    style={{
+                      backgroundColor: `${node.color}20`,
+                      borderColor: `${node.color}50`,
+                      color: node.color,
+                    }}
+                  >
+                    {currentStage.name}
+                  </span>
+                </div>
 
-            <div className="max-h-[110px] overflow-y-auto pr-1 pl-4 relative space-y-2 before:absolute before:left-1.5 before:top-1.5 before:bottom-1.5 before:w-0.5 before:bg-white/10">
-              {profile.stages.map((stg) => {
-                const isCompleted = totalHours >= stg.maxHours && stg.maxHours < 10000;
-                const isCurrent = currentStage.id === stg.id;
+                <p className="text-[11px] text-zinc-300 leading-snug">
+                  {currentStage.description}
+                </p>
 
-                return (
-                  <div key={stg.id} className="relative flex items-center justify-between text-[11px] gap-2">
-                    {/* Node Dot on Cosmic Track */}
-                    <div
-                      className={cn(
-                        'absolute -left-4 w-3.5 h-3.5 rounded-full flex items-center justify-center border transition-all duration-300',
-                        isCompleted
-                          ? 'bg-accent/20 border-accent text-accent'
-                          : isCurrent
-                          ? 'bg-cyan-400/20 border-cyan-400 ring-2 ring-cyan-400/40 shadow-[0_0_8px_rgba(34,211,238,0.7)]'
-                          : 'bg-white/5 border-white/15 text-zinc-600',
-                      )}
-                    >
-                      {isCompleted ? (
-                        <CheckCircle2 size={9} className="text-accent" />
-                      ) : (
-                        <div
-                          className={cn(
-                            'w-1.5 h-1.5 rounded-full',
-                            isCurrent ? 'bg-cyan-400 animate-pulse' : 'bg-zinc-600',
-                          )}
-                        />
-                      )}
-                    </div>
-
-                    <span
-                      className={cn(
-                        'font-medium truncate',
-                        isCurrent
-                          ? 'text-cyan-300 font-bold'
-                          : isCompleted
-                          ? 'text-zinc-200'
-                          : 'text-zinc-500',
-                      )}
-                    >
-                      {stg.name}
+                {/* Stage Progress Bar */}
+                <div className="space-y-1 pt-0.5">
+                  <div className="flex items-center justify-between text-[9px] text-zinc-400 tabular-nums">
+                    <span>
+                      {totalHours.toFixed(1)}h /{' '}
+                      {stageMax >= 10000 ? '1,200h+' : `${stageMax}h`}
                     </span>
-
-                    <span className="text-[10px] text-zinc-500 font-semibold tabular-nums flex-shrink-0">
-                      {stg.minHours}–{stg.maxHours >= 10000 ? '1,200h+' : `${stg.maxHours}h`}
+                    <span className="text-zinc-200 font-semibold">
+                      {Math.round(stageProgressPercent)}%
                     </span>
                   </div>
-                );
-              })}
+
+                  <div className="w-full h-1.5 rounded-full bg-black/40 border border-white/[0.06] overflow-hidden relative">
+                    <div
+                      className="h-full rounded-full transition-all duration-700"
+                      style={{
+                        width: `${stageProgressPercent}%`,
+                        backgroundColor: node.color,
+                        boxShadow: `0 0 12px ${node.color}90`,
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Next Horizon Checkpoint */}
+                {nextHorizon ? (
+                  <div className="pt-1.5 border-t border-white/[0.06] flex items-center justify-between text-[11px]">
+                    <div className="flex items-center gap-1 text-zinc-300">
+                      <Compass size={12} className="text-cyan-400 flex-shrink-0" />
+                      <span className="font-bold">Next: {nextHorizon}h</span>
+                    </div>
+                    {typeof hoursRemaining === 'number' && hoursRemaining > 0 && (
+                      <span className="text-[10px] text-zinc-400 tabular-nums">
+                        {hoursRemaining.toFixed(1)}h away
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="pt-1.5 border-t border-white/[0.06] flex items-center gap-1 text-[11px] text-zinc-300">
+                    <Sparkles size={12} className="text-amber-400" />
+                    <span className="font-bold">Journey Milestone Reached</span>
+                  </div>
+                )}
+              </div>
+
+              {/* ── Compact Growth Path Track ──────────────────── */}
+              <div className="space-y-1.5 pt-0.5">
+                <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-wider text-zinc-500">
+                  <span>Growth Path</span>
+                  <span className="font-normal text-zinc-500 truncate max-w-[140px]">
+                    {profile.title}
+                  </span>
+                </div>
+
+                <div className="max-h-[110px] overflow-y-auto pr-1 pl-4 relative space-y-2 before:absolute before:left-1.5 before:top-1.5 before:bottom-1.5 before:w-0.5 before:bg-white/10">
+                  {profile.stages.map((stg) => {
+                    const isCompleted =
+                      totalHours >= stg.maxHours && stg.maxHours < 10000;
+                    const isCurrent = currentStage.id === stg.id;
+
+                    return (
+                      <div
+                        key={stg.id}
+                        className="relative flex items-center justify-between text-[11px] gap-2"
+                      >
+                        <div
+                          className={cn(
+                            'absolute -left-4 w-3.5 h-3.5 rounded-full flex items-center justify-center border transition-all duration-300',
+                            isCompleted
+                              ? 'bg-accent/20 border-accent text-accent'
+                              : isCurrent
+                              ? 'bg-cyan-400/20 border-cyan-400 ring-2 ring-cyan-400/40 shadow-[0_0_8px_rgba(34,211,238,0.7)]'
+                              : 'bg-white/5 border-white/15 text-zinc-600',
+                          )}
+                        >
+                          {isCompleted ? (
+                            <CheckCircle2 size={9} className="text-accent" />
+                          ) : (
+                            <div
+                              className={cn(
+                                'w-1.5 h-1.5 rounded-full',
+                                isCurrent
+                                  ? 'bg-cyan-400 animate-pulse'
+                                  : 'bg-zinc-600',
+                              )}
+                            />
+                          )}
+                        </div>
+
+                        <span
+                          className={cn(
+                            'font-medium truncate',
+                            isCurrent
+                              ? 'text-cyan-300 font-bold'
+                              : isCompleted
+                              ? 'text-zinc-200'
+                              : 'text-zinc-500',
+                          )}
+                        >
+                          {stg.name}
+                        </span>
+
+                        <span className="text-[10px] text-zinc-500 font-semibold tabular-nums flex-shrink-0">
+                          {stg.minHours}–
+                          {stg.maxHours >= 10000 ? '1,200h+' : `${stg.maxHours}h`}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          ) : (
+            /* ── Practice Journal Tab ────────────────────────── */
+            <div className="space-y-2">
+              {skillSessions.length === 0 ? (
+                <div className="text-center py-6 px-3 rounded-2xl bg-white/[0.02] border border-dashed border-white/10 space-y-1">
+                  <span className="text-xl">🎯</span>
+                  <p className="text-xs font-semibold text-zinc-300">
+                    No deliberate practice logged yet
+                  </p>
+                  <p className="text-[10px] text-zinc-500">
+                    Start a focus session below to record your intentions and insights.
+                  </p>
+                </div>
+              ) : (
+                <div className="max-h-[210px] overflow-y-auto pr-1 space-y-2">
+                  {skillSessions.slice(0, 10).map((sess) => {
+                    const stars = sess.reflection?.qualityRating ?? 4;
+                    const dateFormatted = new Date(sess.startedAt).toLocaleDateString(
+                      undefined,
+                      { month: 'short', day: 'numeric' },
+                    );
+
+                    return (
+                      <div
+                        key={sess.id}
+                        className="p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.07] space-y-1.5"
+                      >
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="text-zinc-400 font-medium">
+                            {dateFormatted}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <div className="flex items-center text-amber-400 text-[10px]">
+                              {'★'.repeat(stars)}
+                              <span className="text-zinc-600">
+                                {'★'.repeat(Math.max(0, 5 - stars))}
+                              </span>
+                            </div>
+                            <span className="font-bold text-zinc-300 tabular-nums">
+                              {Math.round(sess.durationSeconds / 60)}m
+                            </span>
+                          </div>
+                        </div>
+
+                        {sess.intention && (
+                          <div className="flex items-center gap-1.5 text-[11px] text-zinc-200 font-semibold">
+                            <Target size={11} className="text-accent flex-shrink-0" />
+                            <span className="truncate">{sess.intention}</span>
+                          </div>
+                        )}
+
+                        {sess.reflection?.notes && (
+                          <p className="text-[10px] text-zinc-400 italic bg-white/[0.02] px-2 py-1 rounded-md border border-white/[0.04]">
+                            "{sess.reflection.notes}"
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          </div>
+          )}
         </div>
 
         {/* ── 5. Primary Start Focus CTA ───────────────────────── */}

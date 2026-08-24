@@ -90,25 +90,54 @@ export function SessionHistory() {
                   const skill = skills.find(
                     (s) => s.id === session.skillId,
                   );
+                  const stars = session.reflection?.qualityRating ?? 4;
                   return (
                     <div
                       key={session.id}
-                      className="flex items-center gap-3 py-2.5 px-3 rounded-lg bg-surface border border-edge/30"
+                      className="py-3 px-3.5 rounded-xl bg-surface border border-edge/30 space-y-2"
                     >
-                      <span className="text-base flex-shrink-0">
-                        {skill?.icon ?? '🎯'}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-zinc-200 truncate">
-                          {skill?.name ?? 'Unknown'}
-                        </p>
-                        <p className="text-xs text-zinc-500">
-                          {formatRelativeTime(session.startedAt)}
-                        </p>
+                      <div className="flex items-center gap-3">
+                        <span className="text-base flex-shrink-0">
+                          {skill?.icon ?? '🎯'}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-zinc-200 truncate">
+                            {skill?.name ?? 'Unknown'}
+                          </p>
+                          <div className="flex items-center gap-2 text-xs text-zinc-500">
+                            <span>{formatRelativeTime(session.startedAt)}</span>
+                            <span className="text-zinc-700">•</span>
+                            <div className="flex items-center text-amber-400 text-[10px]">
+                              {'★'.repeat(stars)}
+                              <span className="text-zinc-700">
+                                {'★'.repeat(Math.max(0, 5 - stars))}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <span className="text-sm font-bold text-zinc-300 tabular-nums flex-shrink-0">
+                          {formatDuration(session.durationSeconds)}
+                        </span>
                       </div>
-                      <span className="text-sm font-medium text-zinc-300 tabular-nums flex-shrink-0">
-                        {formatDuration(session.durationSeconds)}
-                      </span>
+
+                      {session.intention && (
+                        <div className="flex items-center gap-1.5 text-xs text-zinc-300 font-medium pl-8">
+                          <span className="text-accent text-[10px] font-bold uppercase tracking-wider">
+                            Target:
+                          </span>
+                          <span className="truncate italic text-zinc-200">
+                            "{session.intention}"
+                          </span>
+                        </div>
+                      )}
+
+                      {session.reflection?.notes && (
+                        <div className="pl-8">
+                          <p className="text-xs text-zinc-400 italic bg-white/[0.02] border border-white/[0.04] px-2.5 py-1 rounded-lg">
+                            {session.reflection.notes}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   );
                 })}

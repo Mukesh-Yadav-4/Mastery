@@ -302,6 +302,9 @@ export function createSession(
   startedAt: number,
   endedAt: number,
   durationSeconds: number,
+  intention?: string,
+  targetDurationSeconds?: number | null,
+  reflection?: FocusSession['reflection'],
 ): FocusSession {
   if (durationSeconds <= 0) {
     throw new Error('Session duration must be positive');
@@ -317,6 +320,9 @@ export function createSession(
     endedAt: new Date(endedAt).toISOString(),
     durationSeconds: Math.round(durationSeconds),
     status: 'completed',
+    intention: intention?.trim() || undefined,
+    targetDurationSeconds: targetDurationSeconds ?? undefined,
+    reflection,
     createdAt: new Date().toISOString(),
   };
 

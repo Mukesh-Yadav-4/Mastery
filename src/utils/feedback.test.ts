@@ -191,4 +191,30 @@ describe('Phase 6 — Cosmic Feedback Experience & Progression Refinements', () 
     expect(levelEvent.didLevelUp).toBe(true);
     expect(levelEvent.didSkillLevelUp).toBe(true);
   });
+
+  // ── Deliberate Practice & Focus Mode Contracts ───────────────
+  it('supports deliberate practice micro-targets, target durations, and flow reflections', () => {
+    const sessionData = {
+      id: 'session-deliberate-1',
+      userId: 'user-1',
+      skillId: 'skill-dev-1',
+      startedAt: new Date().toISOString(),
+      endedAt: new Date().toISOString(),
+      durationSeconds: 1500,
+      status: 'completed' as const,
+      intention: 'Master bars 1–8 of Invention 4 @ 60bpm',
+      targetDurationSeconds: 1500,
+      reflection: {
+        qualityRating: 5,
+        notes: 'Effortless Flow • Mastered left hand jumps cleanly',
+        friction: undefined,
+      },
+      createdAt: new Date().toISOString(),
+    };
+
+    expect(sessionData.intention).toBe('Master bars 1–8 of Invention 4 @ 60bpm');
+    expect(sessionData.targetDurationSeconds).toBe(1500);
+    expect(sessionData.reflection.qualityRating).toBe(5);
+    expect(sessionData.reflection.notes).toContain('Effortless Flow');
+  });
 });

@@ -11,9 +11,12 @@ import type { CosmicNodeData } from './CosmicNode';
 import { Plus, Sparkles } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { CosmicDevTools } from '../dev/CosmicDevTools';
+import { StartFocusModal } from '../focus/StartFocusModal';
+import type { Skill } from '../../types';
 
 export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => void }) {
   const {
+    skills,
     skillProgress,
     totalSeconds,
     streak,
@@ -24,6 +27,8 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
     activeFeedbackEvent,
     dismissFeedback,
   } = useApp();
+
+  const [focusLauncherSkill, setFocusLauncherSkill] = useState<Skill | null>(null);
 
   const [feedbackPhase, setFeedbackPhase] = useState<
     'idle' | 'focus' | 'core_charge' | 'transfer' | 'absorption' | 'reveal' | 'settled'
@@ -127,8 +132,20 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
       onOpenCreateSkill();
       return;
     }
-    setIsJourneyOpen(false);
-    startTimer(skillId);
+    const skill = skills.find((s) => s.id === skillId) || null;
+    if (skill) {
+      setIsJourneyOpen(false);
+      setFocusLauncherSkill(skill);
+    }
+  };
+
+  const handleConfirmStartFocus = (
+    skillId: string,
+    intention?: string,
+    targetDurationSeconds?: number | null,
+  ) => {
+    setFocusLauncherSkill(null);
+    startTimer(skillId, intention, targetDurationSeconds);
   };
 
   const hasSkills = sceneNodes.length > 0;
@@ -171,6 +188,14 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
             onStartFocus={handleStartFocus}
           />
         )}
+
+        {/* Deliberate Practice Start Focus Modal */}
+        <StartFocusModal
+          open={Boolean(focusLauncherSkill)}
+          skill={focusLauncherSkill}
+          onClose={() => setFocusLauncherSkill(null)}
+          onStart={handleConfirmStartFocus}
+        />
 
         {/* Cinematic Feedback Reward Overlay (Appears on Reveal/Settled phase) */}
         {activeFeedbackEvent &&
