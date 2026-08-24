@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
@@ -8,6 +8,7 @@ import type { SkillProgressionState } from '../../utils/progression';
 import { type CorePalette, getCorePalette } from '../../utils/palettes';
 import type { CosmicFeedbackEvent } from '../../types';
 import { soundEngine } from '../../utils/audio';
+import { RotateCcw } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 export interface SceneNodeData {
@@ -256,11 +257,41 @@ export function Cosmos3DScene({
     paletteRef.current = activePalette;
   }, [activePalette]);
 
-  // Mouse & render loop references
+  // Mouse, 3D Orbit & render loop references
   const mousePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const targetMouseRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const hoveredNodeIdRef = useRef<string | null>(null);
   const baseCameraZRef = useRef<number>(14.5);
+
+  const orbitStateRef = useRef({
+    isDragging: false,
+    dragStartX: 0,
+    dragStartY: 0,
+    orbitAngleX: 0,
+    orbitAngleY: 0,
+    targetOrbitAngleX: 0,
+    targetOrbitAngleY: 0,
+    zoomDistance: 14.5,
+    targetZoomDistance: 14.5,
+    currentLookAt: new THREE.Vector3(0, 0, 0),
+    targetLookAt: new THREE.Vector3(0, 0, 0),
+    lastInteractionTime: 0,
+    hasMoved: false,
+  });
+
+  const [isDraggingCanvas, setIsDraggingCanvas] = useState(false);
+  const [hasCustomOrbit, setHasCustomOrbit] = useState(false);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return; // Only main left click
+    const state = orbitStateRef.current;
+    state.isDragging = true;
+    state.dragStartX = e.clientX;
+    state.dragStartY = e.clientY;
+    state.hasMoved = false;
+    state.lastInteractionTime = performance.now();
+    setIsDraggingCanvas(true);
+  }, []);
 
   const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (!mountRef.current) return;
@@ -269,6 +300,50 @@ export function Cosmos3DScene({
     const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     const y = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
     targetMouseRef.current = { x, y };
+
+    const state = orbitStateRef.current;
+    if (state.isDragging) {
+      const deltaX = e.clientX - state.dragStartX;
+      const deltaY = e.clientY - state.dragStartY;
+      if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) {
+        state.hasMoved = true;
+        setHasCustomOrbit(true);
+      }
+      state.targetOrbitAngleX += deltaX * 0.0055;
+      state.targetOrbitAngleY = Math.max(
+        -Math.PI * 0.38,
+        Math.min(Math.PI * 0.38, state.targetOrbitAngleY - deltaY * 0.0055),
+      );
+      state.dragStartX = e.clientX;
+      state.dragStartY = e.clientY;
+      state.lastInteractionTime = performance.now();
+    }
+  }, []);
+
+  const handlePointerUp = useCallback(() => {
+    orbitStateRef.current.isDragging = false;
+    setIsDraggingCanvas(false);
+  }, []);
+
+  const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    const state = orbitStateRef.current;
+    const zoomDelta = e.deltaY * 0.01;
+    state.targetZoomDistance = Math.max(
+      7.0,
+      Math.min(22.0, state.targetZoomDistance + zoomDelta),
+    );
+    state.lastInteractionTime = performance.now();
+    setHasCustomOrbit(true);
+  }, []);
+
+  const handleResetCamera = useCallback(() => {
+    const state = orbitStateRef.current;
+    state.targetOrbitAngleX = 0;
+    state.targetOrbitAngleY = 0;
+    state.targetZoomDistance = baseCameraZRef.current;
+    state.targetLookAt.set(0, 0, 0);
+    state.lastInteractionTime = performance.now();
+    setHasCustomOrbit(false);
   }, []);
 
   useEffect(() => {
@@ -885,6 +960,9 @@ export function Cosmos3DScene({
     const mouseVector = new THREE.Vector2();
 
     const handleCanvasClick = (e: MouseEvent) => {
+      const state = orbitStateRef.current;
+      if (state.hasMoved) return; // User was orbiting/dragging, ignore click
+
       const rect = renderer.domElement.getBoundingClientRect();
       if (rect.width <= 0 || rect.height <= 0) return;
       mouseVector.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -901,7 +979,10 @@ export function Cosmos3DScene({
       if (intersects.length > 0) {
         const hitGroup = intersects[0].object.parent;
         if (hitGroup && hitGroup.userData?.nodeData) {
-          onSelectNodeRef.current(hitGroup.userData.nodeData);
+          const nodeData = hitGroup.userData.nodeData as SceneNodeData;
+          const nodeIndex = nodesRef.current.findIndex((n) => n.id === nodeData.id);
+          soundEngine.playOrbSelect(nodeIndex >= 0 ? nodeIndex : 0);
+          onSelectNodeRef.current(nodeData);
         }
       }
     };
@@ -972,21 +1053,6 @@ export function Cosmos3DScene({
       ring3Mat.emissive.lerp(targetRing3, 0.08);
       coreLight1.color.lerp(targetAura, 0.08);
       coreLight2.color.lerp(targetAccent, 0.08);
-
-      // Damped Camera Parallax with Gentle Idle Orbit & Adaptive Z Distance
-      mousePosRef.current.x += (targetMouseRef.current.x - mousePosRef.current.x) * 0.04;
-      mousePosRef.current.y += (targetMouseRef.current.y - mousePosRef.current.y) * 0.04;
-
-      const idleCamX = Math.sin(elapsedTime * 0.5) * 0.3;
-      const idleCamY = Math.cos(elapsedTime * 0.4) * 0.2;
-
-      camera.position.x = mousePosRef.current.x * 1.6 + idleCamX;
-      camera.position.y = mousePosRef.current.y * 1.0 + idleCamY;
-      camera.position.z = baseCameraZRef.current;
-      camera.lookAt(0, 0, 0);
-
-      // ── Mastery Core Dynamics ────────────────────────────────────
-      coreGroup.position.y = Math.sin(elapsedTime * 1.5) * 0.22;
 
       // ── Cinematic Feedback Animation State Machine ───────────
       const cState = cinematicStateRef.current;
@@ -1069,6 +1135,129 @@ export function Cosmos3DScene({
         cState.phase = cinematicPhase;
       }
 
+      // ── Interactive 3D Orbit, Smooth Camera Dynamics & Cinematic Target Glide ──
+      mousePosRef.current.x +=
+        (targetMouseRef.current.x - mousePosRef.current.x) * 0.05;
+      mousePosRef.current.y +=
+        (targetMouseRef.current.y - mousePosRef.current.y) * 0.05;
+
+      const oState = orbitStateRef.current;
+      const selectedId = selectedNodeIdRef.current;
+      const hasActiveSelection = Boolean(selectedId);
+
+      const isIdleDrifting =
+        !oState.isDragging &&
+        !hasActiveSelection &&
+        !isCinematicActive &&
+        performance.now() - oState.lastInteractionTime > 2500;
+
+      if (isIdleDrifting) {
+        oState.targetOrbitAngleX += 0.0006;
+      }
+
+      // Smooth lerping of orbit rotation & zoom
+      oState.orbitAngleX = THREE.MathUtils.lerp(
+        oState.orbitAngleX,
+        oState.targetOrbitAngleX,
+        0.08,
+      );
+      oState.orbitAngleY = THREE.MathUtils.lerp(
+        oState.orbitAngleY,
+        oState.targetOrbitAngleY,
+        0.08,
+      );
+      oState.zoomDistance = THREE.MathUtils.lerp(
+        oState.zoomDistance,
+        oState.targetZoomDistance,
+        0.08,
+      );
+
+      // Target lookAt framing: when a skill is selected, smoothly glide camera target to that node
+      if (hasActiveSelection) {
+        const selectedGroup = nodeMeshes.get(selectedId!);
+        if (selectedGroup) {
+          const targetWorld = new THREE.Vector3();
+          selectedGroup.getWorldPosition(targetWorld);
+          oState.targetLookAt.set(
+            targetWorld.x * 0.55,
+            targetWorld.y * 0.55,
+            targetWorld.z * 0.55,
+          );
+        }
+      } else if (isCinematicActive && cState.targetSkillId) {
+        const targetGroup = nodeMeshes.get(cState.targetSkillId);
+        if (targetGroup) {
+          const targetWorld = new THREE.Vector3();
+          targetGroup.getWorldPosition(targetWorld);
+          oState.targetLookAt.set(
+            targetWorld.x * 0.45,
+            targetWorld.y * 0.45,
+            targetWorld.z * 0.45,
+          );
+        }
+      } else {
+        oState.targetLookAt.set(0, 0, 0);
+      }
+
+      oState.currentLookAt.lerp(oState.targetLookAt, 0.06);
+
+      // Spherical coordinate system around currentLookAt
+      const cosY = Math.cos(oState.orbitAngleY);
+      const sinY = Math.sin(oState.orbitAngleY);
+      const cosX = Math.cos(oState.orbitAngleX);
+      const sinX = Math.sin(oState.orbitAngleX);
+
+      // Parallax offset
+      const parallaxX = mousePosRef.current.x * 0.5;
+      const parallaxY = mousePosRef.current.y * 0.35;
+
+      camera.position.x =
+        oState.currentLookAt.x +
+        oState.zoomDistance * cosY * sinX +
+        parallaxX;
+      camera.position.y =
+        oState.currentLookAt.y +
+        oState.zoomDistance * sinY +
+        parallaxY;
+      camera.position.z =
+        oState.currentLookAt.z + oState.zoomDistance * cosY * cosX;
+      camera.lookAt(oState.currentLookAt);
+
+      // ── Hover Raycasting & Resonant Crystal Audio ───────────────
+      mouseVector.x = targetMouseRef.current.x;
+      mouseVector.y = targetMouseRef.current.y;
+      raycaster.setFromCamera(mouseVector, camera);
+
+      const interactiveHoverMeshes: THREE.Object3D[] = [];
+      nodeMeshes.forEach((group) => {
+        interactiveHoverMeshes.push(...group.children);
+      });
+
+      const hoverIntersects = raycaster.intersectObjects(
+        interactiveHoverMeshes,
+        false,
+      );
+      if (hoverIntersects.length > 0) {
+        const hitGroup = hoverIntersects[0].object.parent;
+        if (hitGroup && hitGroup.userData?.nodeData) {
+          const hitNodeId = hitGroup.userData.nodeData.id;
+          if (hitNodeId && hitNodeId !== hoveredNodeIdRef.current) {
+            hoveredNodeIdRef.current = hitNodeId;
+            const nodeIndex = nodesRef.current.findIndex(
+              (n) => n.id === hitNodeId,
+            );
+            soundEngine.playOrbHover(nodeIndex >= 0 ? nodeIndex : 0);
+            onHoverNodeRef.current?.(hitGroup.userData.nodeData);
+          }
+        }
+      } else if (hoveredNodeIdRef.current !== null) {
+        hoveredNodeIdRef.current = null;
+        onHoverNodeRef.current?.(null);
+      }
+
+      // ── Mastery Core Dynamics ────────────────────────────────────
+      coreGroup.position.y = Math.sin(elapsedTime * 1.5) * 0.22;
+
       const extraCoreRot =
         isCinematicActive && cinematicPhase === 'core_charge'
           ? chargeRatio * 0.12
@@ -1119,9 +1308,6 @@ export function Cosmos3DScene({
       // ── Asynchronous Node Drift & Selection Visual Feedback ───────
       const liveWidth = container.clientWidth || 800;
       const liveHeight = container.clientHeight || 600;
-
-      const selectedId = selectedNodeIdRef.current;
-      const hasActiveSelection = Boolean(selectedId);
 
       curveStreams.forEach((stream, idx) => {
         const group = nodeMeshes.get(stream.targetNodeId);
@@ -1322,12 +1508,33 @@ export function Cosmos3DScene({
   return (
     <div
       ref={mountRef}
+      onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={handlePointerUp}
+      onWheel={handleWheel}
       className={cn(
         'relative w-full h-[520px] sm:h-[620px] lg:h-[680px] overflow-hidden select-none',
+        isDraggingCanvas ? 'cursor-grabbing' : 'cursor-grab',
         className,
       )}
     >
+      {/* Floating Re-Center Orbit Button (Appears when camera has been manually rotated/zoomed) */}
+      {hasCustomOrbit && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleResetCamera();
+          }}
+          className="absolute bottom-20 right-4 z-40 px-2.5 py-1.5 rounded-full bg-surface/85 border border-edge/80 hover:border-accent/60 text-zinc-400 hover:text-zinc-100 text-[11px] font-semibold flex items-center gap-1.5 backdrop-blur-xl shadow-lg transition-all cursor-pointer animate-fade-in pointer-events-auto"
+          title="Re-Center Cosmos View"
+        >
+          <RotateCcw size={12} className="text-accent" />
+          <span>Re-Center</span>
+        </button>
+      )}
+
       {/* ── 2D-in-3D Projected Holographic Node Badges ────────── */}
       {nodes.map((node) => {
         const isSelected = selectedNodeId === node.id;

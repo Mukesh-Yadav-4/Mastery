@@ -233,6 +233,78 @@ class SoundEngine {
       // Graceful fallback
     }
   }
+
+  // 5. Celestial Crystal Hover Ping (Gentle subtle glass touch)
+  private lastHoverTime = 0;
+  playOrbHover(noteIndex = 0, enabled = true) {
+    if (!enabled) return;
+    const nowMs = performance.now();
+    if (nowMs - this.lastHoverTime < 110) return; // Throttle to prevent audio stutter
+    this.lastHoverTime = nowMs;
+
+    try {
+      this.initCtx();
+      if (!this.ctx) return;
+
+      const now = this.ctx.currentTime;
+      const pentatonic = [523.25, 587.33, 659.25, 783.99, 880.0, 1046.5];
+      const freq = pentatonic[noteIndex % pentatonic.length];
+
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now);
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.02, now + 0.12);
+
+      gain.gain.setValueAtTime(0.04, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.16);
+    } catch {
+      // Graceful fallback
+    }
+  }
+
+  // 6. Resonant Celestial Orb Select (Harmonic crystal bell)
+  playOrbSelect(noteIndex = 0, enabled = true) {
+    if (!enabled) return;
+    try {
+      this.initCtx();
+      if (!this.ctx) return;
+
+      const now = this.ctx.currentTime;
+      const pentatonic = [392.0, 440.0, 523.25, 659.25, 783.99, 880.0];
+      const baseFreq = pentatonic[noteIndex % pentatonic.length];
+
+      // Dual harmonic voice: fundamental + perfect 5th overtone
+      [baseFreq, baseFreq * 1.5].forEach((freq, idx) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        const vol = idx === 0 ? 0.14 : 0.08;
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now);
+        osc.frequency.exponentialRampToValueAtTime(freq * 0.99, now + 0.8);
+
+        gain.gain.setValueAtTime(vol, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.85);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.85);
+      });
+    } catch {
+      // Graceful fallback
+    }
+  }
 }
 
 export const soundEngine = new SoundEngine();
