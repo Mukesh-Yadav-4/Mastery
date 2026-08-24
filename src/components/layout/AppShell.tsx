@@ -39,57 +39,60 @@ export function AppShell({
       )}
     >
       {/* Desktop Header */}
-      <header className="hidden md:flex items-center justify-between px-6 h-14 flex-shrink-0 border-b border-edge/50 bg-surface/50 backdrop-blur-sm sticky top-0 z-40">
+      <header className="hidden md:flex items-center justify-between px-6 h-14 flex-shrink-0 border-b border-white/[0.08] bg-[#060813]/65 backdrop-blur-xl sticky top-0 z-40">
         <div className="flex items-center gap-4">
           <button
             type="button"
             onClick={onNavigateLanding}
-            className="text-base font-semibold tracking-tight text-zinc-100 flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"
+            className="text-base font-semibold tracking-tight text-zinc-100 flex items-center gap-2 hover:opacity-90 transition-opacity cursor-pointer group"
             title="View Landing Page & Philosophy"
           >
-            <span className="text-accent text-sm">⚡</span>
-            <span>Mastery</span>
+            <span className="text-accent text-sm drop-shadow-[0_0_8px_rgba(129,140,248,0.8)] group-hover:scale-110 transition-transform">⚡</span>
+            <span className="bg-gradient-to-r from-white via-zinc-100 to-zinc-300 bg-clip-text text-transparent font-bold">Mastery</span>
           </button>
         </div>
 
-        <nav className="flex items-center gap-1">
-          {NAV_ITEMS.map((item) => (
-            <button
-              key={item.view}
-              type="button"
-              onClick={() => setActiveView(item.view)}
-              className={cn(
-                'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors duration-150 cursor-pointer',
-                activeView === item.view
-                  ? 'text-zinc-100 bg-elevated'
-                  : 'text-zinc-500 hover:text-zinc-300 hover:bg-elevated/50',
-              )}
-            >
-              {item.label}
-            </button>
-          ))}
+        <nav className="flex items-center gap-1.5">
+          {/* Holographic Navigation Tabs Capsule */}
+          <div className="flex items-center gap-1 p-1 rounded-2xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-md shadow-inner">
+            {NAV_ITEMS.map((item) => (
+              <button
+                key={item.view}
+                type="button"
+                onClick={() => setActiveView(item.view)}
+                className={cn(
+                  'px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer',
+                  activeView === item.view
+                    ? 'text-white bg-white/[0.12] border border-white/20 shadow-[0_0_16px_rgba(129,140,248,0.25),inset_0_1px_1px_rgba(255,255,255,0.2)]'
+                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05]',
+                )}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
 
           {onNavigateLanding && (
             <button
               type="button"
               onClick={onNavigateLanding}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-zinc-500 hover:text-zinc-300 hover:bg-elevated/50 transition-colors duration-150 cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06] border border-transparent hover:border-white/10 transition-all duration-150 cursor-pointer"
               title="Philosophy & Landing"
             >
-              <Compass size={14} />
+              <Compass size={13} className="text-cyan-400" />
               <span>About</span>
             </button>
           )}
 
-          <div className="w-px h-5 bg-edge mx-2" />
+          <div className="w-px h-5 bg-white/[0.08] mx-1" />
 
           <button
             type="button"
             onClick={signOut}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-zinc-500 hover:text-zinc-300 hover:bg-elevated/50 transition-colors duration-150 cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-zinc-400 hover:text-red-300 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all duration-150 cursor-pointer"
             aria-label="Sign out"
           >
-            <LogOut size={14} />
+            <LogOut size={13} />
             <span className="hidden lg:inline">Sign out</span>
           </button>
         </nav>
@@ -108,26 +111,27 @@ export function AppShell({
       </main>
 
       {/* Mobile Bottom Nav */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-surface/90 backdrop-blur-md border-t border-edge/50 safe-area-bottom">
-        <div className="flex items-center justify-around h-14">
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[#070a16]/85 backdrop-blur-2xl border-t border-white/[0.08] shadow-[0_-10px_30px_rgba(0,0,0,0.6)] safe-area-bottom">
+        <div className="flex items-center justify-around h-14 px-2">
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
+            const isActive = activeView === item.view;
             return (
               <button
                 key={item.view}
                 type="button"
                 onClick={() => setActiveView(item.view)}
                 className={cn(
-                  'flex flex-col items-center justify-center gap-1 w-16 h-full transition-colors duration-150 cursor-pointer',
-                  activeView === item.view
-                    ? 'text-accent'
-                    : 'text-zinc-500 hover:text-zinc-400',
+                  'flex flex-col items-center justify-center gap-1 px-4 py-1.5 rounded-2xl transition-all duration-200 cursor-pointer',
+                  isActive
+                    ? 'text-accent bg-white/[0.08] border border-white/15 shadow-[0_0_14px_rgba(129,140,248,0.3)]'
+                    : 'text-zinc-500 hover:text-zinc-300',
                 )}
                 aria-label={item.label}
-                aria-current={activeView === item.view ? 'page' : undefined}
+                aria-current={isActive ? 'page' : undefined}
               >
-                <Icon size={18} />
-                <span className="text-[10px] font-medium">{item.label}</span>
+                <Icon size={16} className={cn(isActive && 'drop-shadow-[0_0_6px_rgba(129,140,248,0.8)]')} />
+                <span className="text-[10px] font-semibold">{item.label}</span>
               </button>
             );
           })}
