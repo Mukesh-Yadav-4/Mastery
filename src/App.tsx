@@ -168,17 +168,25 @@ function AppRouter() {
 
 /** Main app shell with view routing */
 function AuthenticatedApp({ onNavigateLanding }: { onNavigateLanding: () => void }) {
-  const { activeView, activeTimer, sessionReward, dismissSessionReward } = useApp();
+  const {
+    activeView,
+    activeTimer,
+    sessionReward,
+    dismissSessionReward,
+    activeFeedbackEvent,
+  } = useApp();
 
   // Timer takes over the entire screen for distraction-free focus
   if (activeTimer) {
     return (
       <>
         <FocusTimer />
-        <SessionCompletionModal
-          reward={sessionReward}
-          onDismiss={dismissSessionReward}
-        />
+        {!activeFeedbackEvent && sessionReward && (
+          <SessionCompletionModal
+            reward={sessionReward}
+            onDismiss={dismissSessionReward}
+          />
+        )}
         <MilestoneCelebration />
       </>
     );
@@ -187,10 +195,12 @@ function AuthenticatedApp({ onNavigateLanding }: { onNavigateLanding: () => void
   return (
     <AppShell onNavigateLanding={onNavigateLanding}>
       <ViewRouter activeView={activeView} />
-      <SessionCompletionModal
-        reward={sessionReward}
-        onDismiss={dismissSessionReward}
-      />
+      {!activeFeedbackEvent && sessionReward && (
+        <SessionCompletionModal
+          reward={sessionReward}
+          onDismiss={dismissSessionReward}
+        />
+      )}
       <MilestoneCelebration />
     </AppShell>
   );

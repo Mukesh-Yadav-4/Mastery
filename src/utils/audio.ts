@@ -1,4 +1,4 @@
-﻿// Web Audio API chime & bell synthesizers without external asset dependencies
+// Web Audio API chime & bell synthesizers without external asset dependencies
 class SoundEngine {
   private ctx: AudioContext | null = null;
 
@@ -96,6 +96,40 @@ class SoundEngine {
 
         osc.start(startTime);
         osc.stop(startTime + 0.8);
+      });
+    } catch {
+      // Graceful fallback
+    }
+  }
+
+  // Elevated harmonic shimmer for horizon/stage crossings
+  playHorizonCross(enabled = true) {
+    if (!enabled) return;
+    try {
+      this.initCtx();
+      if (!this.ctx) return;
+
+      const now = this.ctx.currentTime;
+      // Resonant harmonic chord: F#4 (369.99), A#4 (466.16), C#5 (554.37), F#5 (739.99), G#5 (830.61)
+      const chord = [369.99, 466.16, 554.37, 739.99, 830.61];
+      chord.forEach((freq, idx) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        const startTime = now + idx * 0.08;
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, startTime);
+        osc.frequency.exponentialRampToValueAtTime(freq * 1.01, startTime + 2.0);
+
+        gain.gain.setValueAtTime(0.18, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 2.2);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.start(startTime);
+        osc.stop(startTime + 2.2);
       });
     } catch {
       // Graceful fallback

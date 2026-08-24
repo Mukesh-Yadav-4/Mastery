@@ -4,6 +4,7 @@ import { Cosmos3DScene, type SceneNodeData } from './Cosmos3DScene';
 import { CosmicHUD } from './CosmicHUD';
 import { SkillJourneyPanel } from './SkillJourneyPanel';
 import { SkillNodePreview } from './SkillNodePreview';
+import { CosmicFeedbackOverlay } from './CosmicFeedbackOverlay';
 import { formatDuration } from '../../utils/calculations';
 import { getSkillProgressionState } from '../../utils/progression';
 import type { CosmicNodeData } from './CosmicNode';
@@ -19,7 +20,13 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
     globalLevelInfo,
     corePalette,
     startTimer,
+    activeFeedbackEvent,
+    dismissFeedback,
   } = useApp();
+
+  const [feedbackPhase, setFeedbackPhase] = useState<
+    'idle' | 'focus' | 'core_charge' | 'transfer' | 'absorption' | 'reveal' | 'settled'
+  >('idle');
 
   // Map ONLY real active user skills into 3D scene node data with progression profiles
   const sceneNodes: SceneNodeData[] = useMemo(() => {
@@ -60,10 +67,14 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
   // Skill Journey deep interpretation panel open state
   const [isJourneyOpen, setIsJourneyOpen] = useState(false);
 
-  // Keep selection synchronized with real skills list (resets cleanly when a skill is deleted)
-  const activeSelectedId = sceneNodes.some((n) => n.id === selectedNodeId)
+  // Keep selection synchronized with real skills list (or active feedback event)
+  const activeSelectedId = activeFeedbackEvent
+    ? activeFeedbackEvent.skillId
+    : sceneNodes.some((n) => n.id === selectedNodeId)
     ? selectedNodeId
     : sceneNodes[0]?.id ?? '';
+
+  const effectiveJourneyOpen = isJourneyOpen && !activeFeedbackEvent;
 
   const selectedNode = useMemo(() => {
     const found = sceneNodes.find((n) => n.id === activeSelectedId) || sceneNodes[0] || null;
@@ -126,20 +137,29 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
         />
 
         {/* Hover Node Contextual Preview */}
-        {!isJourneyOpen && hoveredNode && (
+        {!effectiveJourneyOpen && hoveredNode && !activeFeedbackEvent && (
           <div className="absolute top-16 sm:top-20 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
             <SkillNodePreview node={hoveredNode} />
           </div>
         )}
 
         {/* Interactive Full Skill Journey Panel (Floating Overlay) */}
-        {isJourneyOpen && selectedNode && (
+        {effectiveJourneyOpen && selectedNode && (
           <SkillJourneyPanel
             node={selectedNode}
             onClose={() => setIsJourneyOpen(false)}
             onStartFocus={handleStartFocus}
           />
         )}
+
+        {/* Cinematic Feedback Reward Overlay (Appears on Reveal/Settled phase) */}
+        {activeFeedbackEvent &&
+          (feedbackPhase === 'reveal' || feedbackPhase === 'settled') && (
+            <CosmicFeedbackOverlay
+              event={activeFeedbackEvent}
+              onDismiss={dismissFeedback}
+            />
+          )}
 
         {/* Zero-Skill Empty State Prompt Overlay */}
         {!hasSkills && (
@@ -180,6 +200,8 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
           onHoverNode={setHoveredNode}
           globalLevel={globalLevelInfo.level}
           palette={corePalette}
+          feedbackEvent={activeFeedbackEvent}
+          onFeedbackPhaseChange={setFeedbackPhase}
           className="w-full h-full"
         />
       </div>

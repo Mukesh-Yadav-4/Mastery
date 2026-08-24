@@ -128,3 +128,33 @@ export interface SessionRewardData {
   newSkillLevelInfo: LevelInfo;
   didSkillLevelUp: boolean;
 }
+
+export interface CosmicFeedbackEvent {
+  id: string;
+  skillId: string;
+  skillName: string;
+  skillIcon: string;
+  skillColor: string;
+  durationSeconds: number;
+  xpEarned: number;
+  baseXP: number;
+  bonusXP: number;
+  previousSeconds: number;
+  newSeconds: number;
+  previousHours: number;
+  newHours: number;
+  previousGlobalLevel: LevelInfo;
+  newGlobalLevel: LevelInfo;
+  previousSkillLevel: LevelInfo;
+  newSkillLevel: LevelInfo;
+  didLevelUp: boolean;
+  didSkillLevelUp: boolean;
+  crossedHorizon: boolean;
+  newHorizonHours: number | null;
+  crossedStage: boolean;
+  previousStageName: string;
+  newStageName: string;
+  stageTransitionTriggered: boolean;
+  significance: 'short' | 'normal' | 'long' | 'horizon';
+}
+

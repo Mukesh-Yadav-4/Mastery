@@ -7,6 +7,8 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import type { SkillProgressionState } from '../../utils/progression';
 import { calculateLevelAura } from '../../utils/progression';
 import { type CorePalette, getCorePalette } from '../../utils/palettes';
+import type { CosmicFeedbackEvent } from '../../types';
+import { soundEngine } from '../../utils/audio';
 import { cn } from '../../lib/utils';
 
 export interface SceneNodeData {
@@ -30,6 +32,10 @@ interface Cosmos3DSceneProps {
   onHoverNode?: (node: SceneNodeData | null) => void;
   globalLevel?: number;
   palette?: CorePalette;
+  feedbackEvent?: CosmicFeedbackEvent | null;
+  onFeedbackPhaseChange?: (
+    phase: 'idle' | 'focus' | 'core_charge' | 'transfer' | 'absorption' | 'reveal' | 'settled',
+  ) => void;
   className?: string;
 }
 
@@ -83,6 +89,8 @@ export function Cosmos3DScene({
   onHoverNode,
   globalLevel = 1,
   palette,
+  feedbackEvent,
+  onFeedbackPhaseChange,
   className,
 }: Cosmos3DSceneProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -103,6 +111,93 @@ export function Cosmos3DScene({
   useEffect(() => {
     onHoverNodeRef.current = onHoverNode;
   }, [onHoverNode]);
+
+  const onFeedbackPhaseChangeRef = useRef(onFeedbackPhaseChange);
+  useEffect(() => {
+    onFeedbackPhaseChangeRef.current = onFeedbackPhaseChange;
+  }, [onFeedbackPhaseChange]);
+
+  const feedbackEventRef = useRef<CosmicFeedbackEvent | null | undefined>(feedbackEvent);
+
+  // Cinematic State Tracker for WebGL Render Loop
+  const cinematicStateRef = useRef<{
+    eventId: string | null;
+    startTime: number;
+    phase: 'idle' | 'focus' | 'core_charge' | 'transfer' | 'absorption' | 'reveal' | 'settled';
+    targetSkillId: string | null;
+    significance: 'short' | 'normal' | 'long' | 'horizon';
+    tFocus: number;
+    tCoreCharge: number;
+    tTransfer: number;
+    tAbsorption: number;
+    soundPlayed: boolean;
+    revealTriggered: boolean;
+  }>({
+    eventId: null,
+    startTime: 0,
+    phase: 'idle',
+    targetSkillId: null,
+    significance: 'normal',
+    tFocus: 350,
+    tCoreCharge: 650,
+    tTransfer: 1100,
+    tAbsorption: 500,
+    soundPlayed: false,
+    revealTriggered: false,
+  });
+
+  useEffect(() => {
+    feedbackEventRef.current = feedbackEvent;
+    if (feedbackEvent && feedbackEvent.id !== cinematicStateRef.current.eventId) {
+      const prefersReducedMotion =
+        typeof window !== 'undefined' &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      if (prefersReducedMotion) {
+        cinematicStateRef.current = {
+          eventId: feedbackEvent.id,
+          startTime: performance.now(),
+          phase: 'settled',
+          targetSkillId: feedbackEvent.skillId,
+          significance: feedbackEvent.significance,
+          tFocus: 0,
+          tCoreCharge: 0,
+          tTransfer: 0,
+          tAbsorption: 0,
+          soundPlayed: true,
+          revealTriggered: true,
+        };
+        onFeedbackPhaseChangeRef.current?.('reveal');
+        return;
+      }
+
+      const sig = feedbackEvent.significance;
+      const tFocus = 350;
+      const tCoreCharge = sig === 'short' ? 500 : sig === 'long' || sig === 'horizon' ? 850 : 650;
+      const tTransfer = sig === 'short' ? 900 : sig === 'long' || sig === 'horizon' ? 1400 : 1100;
+      const tAbsorption = 500;
+
+      cinematicStateRef.current = {
+        eventId: feedbackEvent.id,
+        startTime: performance.now(),
+        phase: 'focus',
+        targetSkillId: feedbackEvent.skillId,
+        significance: sig,
+        tFocus,
+        tCoreCharge,
+        tTransfer,
+        tAbsorption,
+        soundPlayed: false,
+        revealTriggered: false,
+      };
+      onFeedbackPhaseChangeRef.current?.('focus');
+    } else if (!feedbackEvent) {
+      cinematicStateRef.current.eventId = null;
+      cinematicStateRef.current.phase = 'idle';
+      cinematicStateRef.current.soundPlayed = false;
+      cinematicStateRef.current.revealTriggered = false;
+    }
+  }, [feedbackEvent]);
 
   // Active Core Palette Ref for smooth in-loop color lerping (300-500ms)
   const activePalette = palette ?? getCorePalette();
@@ -737,21 +832,86 @@ export function Cosmos3DScene({
       // ── Mastery Core Dynamics ────────────────────────────────────
       coreGroup.position.y = Math.sin(elapsedTime * 1.5) * 0.22;
 
+      // ── Cinematic Feedback Animation State Machine ───────────
+      const cState = cinematicStateRef.current;
+      const isCinematicActive = Boolean(
+        cState.eventId && cState.phase !== 'idle' && cState.phase !== 'settled',
+      );
+      let cinematicPhase = cState.phase;
+      let chargeRatio = 0;
+      let transferRatio = 0;
+      let absorptionRatio = 0;
+
+      if (isCinematicActive) {
+        const nowMs = performance.now();
+        const elapsed = nowMs - cState.startTime;
+
+        if (elapsed < cState.tFocus) {
+          cinematicPhase = 'focus';
+        } else if (elapsed < cState.tFocus + cState.tCoreCharge) {
+          cinematicPhase = 'core_charge';
+          chargeRatio = (elapsed - cState.tFocus) / cState.tCoreCharge;
+        } else if (elapsed < cState.tFocus + cState.tCoreCharge + cState.tTransfer) {
+          cinematicPhase = 'transfer';
+          transferRatio =
+            (elapsed - (cState.tFocus + cState.tCoreCharge)) / cState.tTransfer;
+        } else if (
+          elapsed <
+          cState.tFocus + cState.tCoreCharge + cState.tTransfer + cState.tAbsorption
+        ) {
+          cinematicPhase = 'absorption';
+          absorptionRatio =
+            (elapsed -
+              (cState.tFocus + cState.tCoreCharge + cState.tTransfer)) /
+            cState.tAbsorption;
+
+          if (
+            !cState.soundPlayed &&
+            (cState.significance === 'horizon' ||
+              feedbackEventRef.current?.crossedHorizon)
+          ) {
+            cState.soundPlayed = true;
+            soundEngine.playHorizonCross();
+          }
+        } else {
+          cinematicPhase = 'reveal';
+          if (!cState.revealTriggered) {
+            cState.revealTriggered = true;
+            onFeedbackPhaseChangeRef.current?.('reveal');
+          }
+        }
+        cState.phase = cinematicPhase;
+      }
+
+      const extraCoreRot =
+        isCinematicActive && cinematicPhase === 'core_charge'
+          ? chargeRatio * 0.04
+          : 0;
+
       crystalShell.rotation.y = elapsedTime * 0.45;
       crystalShell.rotation.x = Math.sin(elapsedTime * 0.3) * 0.25;
       latticeShell.rotation.y = -elapsedTime * 0.32;
       latticeShell.rotation.z = elapsedTime * 0.2;
-      innerCore.rotation.y = -elapsedTime * 0.75;
+      innerCore.rotation.y = -elapsedTime * 0.75 - extraCoreRot;
       innerCore.rotation.z = elapsedTime * 0.4;
 
       const pulseScale = 1.0 + Math.sin(elapsedTime * 2.5) * 0.08;
       innerCore.scale.set(pulseScale, pulseScale, pulseScale);
-      innerMat.emissiveIntensity = 2.4 + Math.sin(elapsedTime * 2.0) * 0.9;
 
-      ring1.rotation.z = elapsedTime * 0.55;
+      const basePulse = 2.4 + Math.sin(elapsedTime * 2.0) * 0.9;
+      let feedbackCoreEmissive = 0;
+      if (cinematicPhase === 'core_charge') {
+        feedbackCoreEmissive =
+          chargeRatio * (cState.significance === 'horizon' ? 3.0 : 1.8);
+      } else if (cinematicPhase === 'transfer') {
+        feedbackCoreEmissive = (1.0 - transferRatio) * 1.5;
+      }
+      innerMat.emissiveIntensity = basePulse + feedbackCoreEmissive;
+
+      ring1.rotation.z = elapsedTime * 0.55 + extraCoreRot * 0.8;
       ring1.rotation.y = Math.PI / 6 + Math.sin(elapsedTime * 0.6) * 0.15;
 
-      ring2.rotation.z = -elapsedTime * 0.42;
+      ring2.rotation.z = -elapsedTime * 0.42 - extraCoreRot * 0.8;
       ring2.rotation.x = -Math.PI / 4 + Math.cos(elapsedTime * 0.5) * 0.15;
 
       ring3.rotation.y = elapsedTime * 0.32;
@@ -763,7 +923,9 @@ export function Cosmos3DScene({
 
       // ── Asynchronous Node Drift & Selection Visual Feedback ───────
       const activePulseCycle = 7.0; // 7s pulse period
-      const pulseIndex = Math.floor(elapsedTime / activePulseCycle) % Math.max(1, curveStreams.length);
+      const pulseIndex =
+        Math.floor(elapsedTime / activePulseCycle) %
+        Math.max(1, curveStreams.length);
       const pulseProgress = (elapsedTime % activePulseCycle) / 1.8; // 1.8s travel duration
 
       const liveWidth = container.clientWidth || 800;
@@ -777,9 +939,12 @@ export function Cosmos3DScene({
         if (!group) return;
 
         // A. Asynchronous Multi-Frequency 3D Node Drift
-        const dx = Math.sin(elapsedTime * stream.freqX + stream.phaseX) * stream.ampX;
-        const dy = Math.sin(elapsedTime * stream.freqY + stream.phaseY) * stream.ampY;
-        const dz = Math.cos(elapsedTime * stream.freqZ + stream.phaseZ) * stream.ampZ;
+        const dx =
+          Math.sin(elapsedTime * stream.freqX + stream.phaseX) * stream.ampX;
+        const dy =
+          Math.sin(elapsedTime * stream.freqY + stream.phaseY) * stream.ampY;
+        const dz =
+          Math.cos(elapsedTime * stream.freqZ + stream.phaseZ) * stream.ampZ;
         group.position.set(
           stream.basePos.x + dx,
           stream.basePos.y + dy,
@@ -795,22 +960,39 @@ export function Cosmos3DScene({
           const pt = stream.curve.getPointAt(t);
           bead.mesh.position.copy(pt);
 
-          const scalePulse = 0.95 + Math.sin(elapsedTime * 8.0 + bead.offset * 12) * 0.3;
+          const scalePulse =
+            0.95 + Math.sin(elapsedTime * 8.0 + bead.offset * 12) * 0.3;
           bead.mesh.scale.set(scalePulse, scalePulse, scalePulse);
         });
 
-        // D. Calm Core -> Node Network Pulse
+        // D. Network Pulse Surge / Cinematic Energy Transfer Surge
         const isCurrentPulseStream = idx === pulseIndex;
+        const isTargetSkill = cState.targetSkillId === stream.targetNodeId;
         const pulseMat = stream.pulseMesh.material as THREE.MeshBasicMaterial;
         const tubeMat = stream.glowTubeMesh.material as THREE.MeshStandardMaterial;
 
-        if (isCurrentPulseStream && pulseProgress <= 1.0) {
+        if (isCinematicActive && isTargetSkill && cinematicPhase === 'transfer') {
+          const pulsePt = stream.curve.getPointAt(transferRatio);
+          stream.pulseMesh.position.copy(pulsePt);
+          const pulseScale = 1.5 + Math.sin(transferRatio * Math.PI) * 0.8;
+          stream.pulseMesh.scale.set(pulseScale, pulseScale, pulseScale);
+          pulseMat.opacity = 0.95;
+
+          tubeMat.opacity = 0.85;
+          tubeMat.emissiveIntensity =
+            2.0 + Math.sin(transferRatio * Math.PI) * 3.5;
+        } else if (
+          isCurrentPulseStream &&
+          pulseProgress <= 1.0 &&
+          !isCinematicActive
+        ) {
           const pulsePt = stream.curve.getPointAt(pulseProgress);
           stream.pulseMesh.position.copy(pulsePt);
 
           const opacity = Math.sin(pulseProgress * Math.PI) * 0.95;
           pulseMat.opacity = opacity;
-          tubeMat.emissiveIntensity = 1.5 + Math.sin(pulseProgress * Math.PI) * 1.8;
+          tubeMat.emissiveIntensity =
+            1.5 + Math.sin(pulseProgress * Math.PI) * 1.8;
 
           if (pulseProgress > 0.8) {
             const light = nodePointLights.get(stream.targetNodeId);
@@ -820,17 +1002,47 @@ export function Cosmos3DScene({
           pulseMat.opacity = 0;
         }
 
-        // ── Selection Lighting & Aura Amplification ───────────────
+        // ── Selection & Cinematic Lighting & Aura Amplification ────
         const isSelected = selectedId === stream.targetNodeId;
         const isHovered = hoveredNodeIdRef.current === stream.targetNodeId;
-        const targetScale = isSelected ? 1.30 : isHovered ? 1.18 : 1.0;
-        group.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.1);
+        let targetScale = isSelected ? 1.3 : isHovered ? 1.18 : 1.0;
 
-        if (isSelected) {
+        if (isCinematicActive && isTargetSkill) {
+          if (cinematicPhase === 'focus' || cinematicPhase === 'core_charge') {
+            targetScale = 1.25;
+          } else if (cinematicPhase === 'transfer') {
+            targetScale = 1.25 + Math.sin(transferRatio * Math.PI) * 0.12;
+          } else if (cinematicPhase === 'absorption') {
+            targetScale =
+              1.25 +
+              Math.sin(absorptionRatio * Math.PI) *
+                (cState.significance === 'horizon' ? 0.45 : 0.28);
+          }
+        }
+        group.scale.lerp(
+          new THREE.Vector3(targetScale, targetScale, targetScale),
+          0.12,
+        );
+
+        if (
+          isCinematicActive &&
+          isTargetSkill &&
+          cinematicPhase === 'absorption'
+        ) {
+          const light = nodePointLights.get(stream.targetNodeId);
+          if (light) {
+            light.intensity =
+              3.0 +
+              Math.sin(absorptionRatio * Math.PI) *
+                (cState.significance === 'horizon' ? 10.0 : 6.0);
+          }
+          tubeMat.opacity = 0.7;
+          tubeMat.emissiveIntensity = 2.5;
+        } else if (isSelected) {
           tubeMat.opacity = 0.65;
           tubeMat.emissiveIntensity = 2.8;
-        } else if (hasActiveSelection) {
-          tubeMat.opacity = 0.20;
+        } else if (hasActiveSelection || isCinematicActive) {
+          tubeMat.opacity = 0.2;
           tubeMat.emissiveIntensity = 0.85;
         } else {
           tubeMat.opacity = 0.38;

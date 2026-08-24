@@ -19,6 +19,7 @@ import type {
   NewSkillData,
   CelebrationData,
   SessionRewardData,
+  CosmicFeedbackEvent,
   LevelInfo,
 } from '../types';
 import { useAuth } from './AuthContext';
@@ -34,6 +35,7 @@ import {
   calculateLevelInfo,
   getSessionXPBreakdown,
 } from '../utils/calculations';
+import { getSkillProgressionState } from '../utils/progression';
 import { MIN_SESSION_DURATION_SECONDS } from '../lib/constants';
 import { getCorePalette, type CorePalette } from '../utils/palettes';
 
@@ -78,6 +80,8 @@ interface AppContextValue {
   dismissCelebration: () => void;
   sessionReward: SessionRewardData | null;
   dismissSessionReward: () => void;
+  activeFeedbackEvent: CosmicFeedbackEvent | null;
+  dismissFeedback: () => void;
 
   // Refresh
   refreshData: () => void;
@@ -95,6 +99,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [activeTimer, setActiveTimer] = useState<TimerState | null>(null);
   const [celebration, setCelebration] = useState<CelebrationData | null>(null);
   const [sessionReward, setSessionReward] = useState<SessionRewardData | null>(null);
+  const [activeFeedbackEvent, setActiveFeedbackEvent] = useState<CosmicFeedbackEvent | null>(null);
   const [paletteId, setPaletteIdState] = useState<string>(() => {
     return db.getStoredPalette(user?.id);
   });
@@ -257,6 +262,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const preGlobalLevel = calculateLevelInfo(preGlobalXP);
     const preSkillXP = getSkillTotalXP(activeTimer.skillId, preSessions);
     const preSkillLevel = calculateLevelInfo(preSkillXP);
+    const preSkillSeconds = preSessions
+      .filter((s) => s.skillId === activeTimer.skillId)
+      .reduce((acc, s) => acc + s.durationSeconds, 0);
+    const preSkillHours = secondsToHours(preSkillSeconds);
+
+    const skill = skills.find((s) => s.id === activeTimer.skillId);
+    const preProgression = skill
+      ? getSkillProgressionState(
+          skill.id,
+          skill.name,
+          preSkillSeconds,
+          preSkillLevel.level,
+          skill.category,
+          skill.targetHours,
+        )
+      : null;
 
     // Save session
     db.createSession(
@@ -273,12 +294,77 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const postGlobalLevel = calculateLevelInfo(postGlobalXP);
     const postSkillXP = getSkillTotalXP(activeTimer.skillId, updatedSessions);
     const postSkillLevel = calculateLevelInfo(postSkillXP);
+    const postSkillSeconds = updatedSessions
+      .filter((s) => s.skillId === activeTimer.skillId)
+      .reduce((acc, s) => acc + s.durationSeconds, 0);
+    const postSkillHours = secondsToHours(postSkillSeconds);
+
+    const postProgression = skill
+      ? getSkillProgressionState(
+          skill.id,
+          skill.name,
+          postSkillSeconds,
+          postSkillLevel.level,
+          skill.category,
+          skill.targetHours,
+        )
+      : null;
 
     const xpBreakdown = getSessionXPBreakdown(durationSeconds, 'completed');
-    const skill = skills.find((s) => s.id === activeTimer.skillId);
 
-    if (skill) {
-      // Set session reward modal data
+    if (skill && preProgression && postProgression) {
+      // Detect Horizon and Stage transitions
+      const crossedHorizon =
+        postProgression.structureTier > preProgression.structureTier ||
+        postProgression.activeCheckpointsCrossed.length >
+          preProgression.activeCheckpointsCrossed.length;
+
+      const crossedStage =
+        postProgression.currentStage.id !== preProgression.currentStage.id;
+
+      let significance: 'short' | 'normal' | 'long' | 'horizon' = 'normal';
+      if (crossedHorizon || crossedStage) {
+        significance = 'horizon';
+      } else if (durationSeconds >= 45 * 60) {
+        significance = 'long';
+      } else if (durationSeconds >= 15 * 60) {
+        significance = 'normal';
+      } else {
+        significance = 'short';
+      }
+
+      const feedbackEvent: CosmicFeedbackEvent = {
+        id: crypto.randomUUID(),
+        skillId: skill.id,
+        skillName: skill.name,
+        skillIcon: skill.icon,
+        skillColor: skill.color,
+        durationSeconds,
+        xpEarned: xpBreakdown.totalXP,
+        baseXP: xpBreakdown.baseXP,
+        bonusXP: xpBreakdown.bonusXP,
+        previousSeconds: preSkillSeconds,
+        newSeconds: postSkillSeconds,
+        previousHours: preSkillHours,
+        newHours: postSkillHours,
+        previousGlobalLevel: preGlobalLevel,
+        newGlobalLevel: postGlobalLevel,
+        previousSkillLevel: preSkillLevel,
+        newSkillLevel: postSkillLevel,
+        didLevelUp: postGlobalLevel.level > preGlobalLevel.level,
+        didSkillLevelUp: postSkillLevel.level > preSkillLevel.level,
+        crossedHorizon,
+        newHorizonHours: postProgression.nextVisualMilestoneHours,
+        crossedStage,
+        previousStageName: preProgression.currentStage.name,
+        newStageName: postProgression.currentStage.name,
+        stageTransitionTriggered: crossedStage,
+        significance,
+      };
+
+      setActiveFeedbackEvent(feedbackEvent);
+
+      // Set session reward modal data as fallback
       setSessionReward({
         skillName: skill.name,
         skillIcon: skill.icon,
@@ -296,15 +382,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
 
       // Check for new milestone unlocks
-      const totalSeconds = updatedSessions
-        .filter((s) => s.skillId === skill.id)
-        .reduce((acc, s) => acc + s.durationSeconds, 0);
-      const totalHrs = secondsToHours(totalSeconds);
-
       const newMilestones = db.checkAndCreateMilestones(
         user.id,
         skill.id,
-        totalHrs,
+        postSkillHours,
         skill.targetHours,
       );
 
@@ -318,7 +399,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           skillIcon: skill.icon,
           skillColor: skill.color,
           percentage: highest.percentage,
-          totalHours: totalHrs,
+          totalHours: postSkillHours,
           targetHours: skill.targetHours,
         });
       }
@@ -385,6 +466,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setSessionReward(null);
   }, []);
 
+  const dismissFeedback = useCallback(() => {
+    setActiveFeedbackEvent(null);
+    setSessionReward(null);
+  }, []);
+
   // ── Refresh ───────────────────────────────────────────────
 
   const refreshData = useCallback(() => {
@@ -423,6 +509,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         dismissCelebration,
         sessionReward,
         dismissSessionReward,
+        activeFeedbackEvent,
+        dismissFeedback,
         refreshData,
       }}
     >
@@ -438,3 +526,4 @@ export function useApp(): AppContextValue {
   }
   return context;
 }
+
