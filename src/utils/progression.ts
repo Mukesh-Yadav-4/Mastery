@@ -26,6 +26,7 @@ export interface ProgressionProfile {
   id: string;
   skillKey: string;
   title: string;
+  category: string;
   sourceNote: string;
   isEvidenceInformed: boolean;
   stages: ProgressionStage[];
@@ -36,6 +37,7 @@ export interface SkillProgressionState {
   skillId: string;
   totalSeconds: number;
   totalHours: number;
+  category: string;
   currentStage: ProgressionStage;
   stageProgressRatio: number; // 0 to 1 within the current stage
   boundedVisualScale: number; // Strictly bounded [0.70, 1.48]
@@ -48,20 +50,21 @@ export interface SkillProgressionState {
   calibrationNote: string;
 }
 
-// ── Checkpoints & Horizons ──────────────────────────────────────
+// ── Checkpoints ──────────────────────────────────────────────────
 export const STANDARD_CHECKPOINTS = [
   25, 50, 75, 100, 150, 200, 300, 500, 600, 1000, 1200,
 ];
 
-// ── Python Progression Profile (Calibrated to Real Python 2026) ─
-export const PYTHON_PROGRESSION_PROFILE: ProgressionProfile = {
-  id: 'profile-python',
-  skillKey: 'python',
-  title: 'Python Development Horizon',
+// ── 1. Programming Progression Profile ───────────────────────────
+export const PROGRAMMING_PROGRESSION_PROFILE: ProgressionProfile = {
+  id: 'profile-programming',
+  skillKey: 'programming',
+  title: 'Programming Development Horizon',
+  category: 'programming',
   sourceNote:
-    'Calibrated from Real Python (2026) evidence-informed planning guidelines. Practice time is an observable investment metric, not a claim of competence.',
+    'Calibrated from evidence-informed deliberate practice planning guidelines. Practice time is an observable investment metric, not a claim of competence.',
   isEvidenceInformed: true,
-  checkpoints: STANDARD_CHECKPOINTS,
+  checkpoints: [25, 50, 75, 100, 150, 200, 300, 500, 600, 1000, 1200],
   stages: [
     {
       id: 'foundation',
@@ -101,7 +104,7 @@ export const PYTHON_PROGRESSION_PROFILE: ProgressionProfile = {
       minScale: 1.15,
       maxScale: 1.28,
       structureTier: 4,
-      description: 'Multi-module codebases, package design, and production patterns.',
+      description: 'Complex systems, performance tuning, and architectural patterns.',
     },
     {
       id: 'job-ready-depth',
@@ -111,7 +114,7 @@ export const PYTHON_PROGRESSION_PROFILE: ProgressionProfile = {
       minScale: 1.28,
       maxScale: 1.40,
       structureTier: 5,
-      description: 'Production portfolio depth, systems integration, and tool chains.',
+      description: 'Production codebases, multi-system integration, and team velocity.',
     },
     {
       id: 'deep-mastery',
@@ -121,20 +124,95 @@ export const PYTHON_PROGRESSION_PROFILE: ProgressionProfile = {
       minScale: 1.40,
       maxScale: 1.48,
       structureTier: 6,
-      description: 'Multi-year domain mastery, performance optimization, and architecture.',
+      description: 'Architectural innovation, deep specialization, and domain mastery.',
     },
   ],
 };
 
-// ── Universal Default Progression Profile ────────────────────────
-export const DEFAULT_PROGRESSION_PROFILE: ProgressionProfile = {
-  id: 'profile-default',
-  skillKey: 'default',
-  title: 'Deliberate Practice Horizon',
+// ── 2. Language Progression Profile ──────────────────────────────
+export const LANGUAGE_PROGRESSION_PROFILE: ProgressionProfile = {
+  id: 'profile-language',
+  skillKey: 'language',
+  title: 'Language Acquisition Horizon',
+  category: 'language',
   sourceNote:
-    'Universal practice progression horizon. Practice time is an observable investment metric, not a claim of competence.',
-  isEvidenceInformed: false,
-  checkpoints: STANDARD_CHECKPOINTS,
+    'Language acquisition deliberate practice horizon. Hour milestones are approximate guideposts and do not guarantee official certification.',
+  isEvidenceInformed: true,
+  checkpoints: [30, 60, 120, 200, 300, 500, 700, 1000, 1400],
+  stages: [
+    {
+      id: 'foundation',
+      name: 'Foundation',
+      minHours: 0,
+      maxHours: 30,
+      minScale: 0.70,
+      maxScale: 0.85,
+      structureTier: 1,
+      description: 'Pronunciation, core phonetics, alphabet, and essential greetings.',
+    },
+    {
+      id: 'early-exposure',
+      name: 'Early Exposure',
+      minHours: 30,
+      maxHours: 120,
+      minScale: 0.85,
+      maxScale: 1.00,
+      structureTier: 2,
+      description: 'High-frequency vocabulary, basic sentence patterns, and survival phrases.',
+    },
+    {
+      id: 'functional-communication',
+      name: 'Functional Communication',
+      minHours: 120,
+      maxHours: 300,
+      minScale: 1.00,
+      maxScale: 1.15,
+      structureTier: 3,
+      description: 'Daily conversations, past/future tenses, and straightforward reading.',
+    },
+    {
+      id: 'independent-communication',
+      name: 'Independent Communication',
+      minHours: 300,
+      maxHours: 700,
+      minScale: 1.15,
+      maxScale: 1.28,
+      structureTier: 4,
+      description: 'Complex discourse, spontaneous speaking, idioms, and media comprehension.',
+    },
+    {
+      id: 'advanced-communication',
+      name: 'Advanced Communication',
+      minHours: 700,
+      maxHours: 1400,
+      minScale: 1.28,
+      maxScale: 1.40,
+      structureTier: 5,
+      description: 'Professional nuance, cultural idioms, native-speed media, and formal writing.',
+    },
+    {
+      id: 'high-proficiency',
+      name: 'High Proficiency',
+      minHours: 1400,
+      maxHours: 10000,
+      minScale: 1.40,
+      maxScale: 1.48,
+      structureTier: 6,
+      description: 'Effortless fluency, deep cultural mastery, and specialized expression.',
+    },
+  ],
+};
+
+// ── 3. Music Progression Profile ─────────────────────────────────
+export const MUSIC_PROGRESSION_PROFILE: ProgressionProfile = {
+  id: 'profile-music',
+  skillKey: 'music',
+  title: 'Musical Development Horizon',
+  category: 'music',
+  sourceNote:
+    'Musical instrument and theory deliberate practice horizon. Hour investments reflect accumulated motor and artistic discipline.',
+  isEvidenceInformed: true,
+  checkpoints: [25, 50, 100, 175, 250, 375, 500, 750, 1000],
   stages: [
     {
       id: 'foundation',
@@ -144,70 +222,376 @@ export const DEFAULT_PROGRESSION_PROFILE: ProgressionProfile = {
       minScale: 0.70,
       maxScale: 0.85,
       structureTier: 1,
-      description: 'Initial fundamentals and orientation.',
+      description: 'Instrument ergonomics, posture, initial scales, and basic rhythm.',
     },
     {
-      id: 'basic-comfort',
-      name: 'Basic Comfort',
+      id: 'technique',
+      name: 'Technique',
       minHours: 25,
-      maxHours: 150,
+      maxHours: 100,
       minScale: 0.85,
       maxScale: 1.00,
       structureTier: 2,
-      description: 'Basic fluency and consistent execution of primary techniques.',
+      description: 'Hand synchronization, chord transitions, finger agility, and tempo consistency.',
     },
     {
-      id: 'solid-ability',
-      name: 'Solid Ability',
-      minHours: 150,
-      maxHours: 300,
+      id: 'repertoire',
+      name: 'Repertoire',
+      minHours: 100,
+      maxHours: 250,
       minScale: 1.00,
       maxScale: 1.15,
       structureTier: 3,
-      description: 'Autonomous problem solving and project building.',
+      description: 'Learning full pieces, dynamics, phrase shaping, and ear training.',
     },
     {
-      id: 'advanced-practice',
-      name: 'Advanced Practice',
-      minHours: 300,
-      maxHours: 600,
+      id: 'applied-performance',
+      name: 'Applied Performance',
+      minHours: 250,
+      maxHours: 500,
       minScale: 1.15,
       maxScale: 1.28,
       structureTier: 4,
-      description: 'Nuanced execution, deeper principles, and workflow speed.',
+      description: 'Expressive interpretation, stage confidence, and fluid improvisation.',
     },
     {
-      id: 'job-ready-depth',
-      name: 'Deep Competence',
-      minHours: 600,
-      maxHours: 1200,
+      id: 'advanced-development',
+      name: 'Advanced Development',
+      minHours: 500,
+      maxHours: 1000,
       minScale: 1.28,
       maxScale: 1.40,
       structureTier: 5,
-      description: 'Extensive portfolio experience and reliable applied skill.',
+      description: 'Complex repertoire, subtle tone control, and personal artistic voice.',
     },
     {
-      id: 'deep-mastery',
-      name: 'Deep Mastery',
-      minHours: 1200,
+      id: 'deep-practice',
+      name: 'Deep Practice',
+      minHours: 1000,
       maxHours: 10000,
       minScale: 1.40,
       maxScale: 1.48,
       structureTier: 6,
-      description: 'Years of dedicated practice, synthesis, and creative mastery.',
+      description: 'Virtuosity, deep musical synthesis, and effortless artistic expression.',
     },
   ],
 };
 
+// ── 4. Creative Arts Progression Profile ─────────────────────────
+export const CREATIVE_PROGRESSION_PROFILE: ProgressionProfile = {
+  id: 'profile-creative',
+  skillKey: 'creative',
+  title: 'Creative Arts Horizon',
+  category: 'creative',
+  sourceNote:
+    'Creative visual and written arts practice horizon. Practice time reflects structured exploration and portfolio depth.',
+  isEvidenceInformed: true,
+  checkpoints: [25, 50, 100, 175, 250, 375, 500, 750, 1000],
+  stages: [
+    {
+      id: 'foundation',
+      name: 'Foundation',
+      minHours: 0,
+      maxHours: 25,
+      minScale: 0.70,
+      maxScale: 0.85,
+      structureTier: 1,
+      description: 'Core tools, materials, basic composition, and foundational techniques.',
+    },
+    {
+      id: 'fundamentals',
+      name: 'Fundamentals',
+      minHours: 25,
+      maxHours: 100,
+      minScale: 0.85,
+      maxScale: 1.00,
+      structureTier: 2,
+      description: 'Proportion, perspective, color theory, light, and regular sketchbook habits.',
+    },
+    {
+      id: 'applied-practice',
+      name: 'Applied Practice',
+      minHours: 100,
+      maxHours: 250,
+      minScale: 1.00,
+      maxScale: 1.15,
+      structureTier: 3,
+      description: 'Completed independent pieces, stylistic exploration, and iterative refinement.',
+    },
+    {
+      id: 'project-depth',
+      name: 'Project Depth',
+      minHours: 250,
+      maxHours: 500,
+      minScale: 1.15,
+      maxScale: 1.28,
+      structureTier: 4,
+      description: 'Multi-stage portfolio projects, cohesive series, and technical polish.',
+    },
+    {
+      id: 'advanced-development',
+      name: 'Advanced Development',
+      minHours: 500,
+      maxHours: 1000,
+      minScale: 1.28,
+      maxScale: 1.40,
+      structureTier: 5,
+      description: 'Distinct creative voice, sophisticated execution, and professional workflows.',
+    },
+    {
+      id: 'deep-practice',
+      name: 'Deep Practice',
+      minHours: 1000,
+      maxHours: 10000,
+      minScale: 1.40,
+      maxScale: 1.48,
+      structureTier: 6,
+      description: 'Visionary synthesis, masterwork creation, and conceptual originality.',
+    },
+  ],
+};
+
+// ── 5. Fitness & Athletic Progression Profile ────────────────────
+export const FITNESS_PROGRESSION_PROFILE: ProgressionProfile = {
+  id: 'profile-fitness',
+  skillKey: 'fitness',
+  title: 'Athletic Development Horizon',
+  category: 'fitness',
+  sourceNote:
+    'Athletic conditioning and movement deliberate practice horizon. Hour investments reflect physical adaptation and habit resilience.',
+  isEvidenceInformed: true,
+  checkpoints: [20, 50, 80, 140, 200, 300, 450, 650, 900],
+  stages: [
+    {
+      id: 'foundation',
+      name: 'Foundation',
+      minHours: 0,
+      maxHours: 20,
+      minScale: 0.70,
+      maxScale: 0.85,
+      structureTier: 1,
+      description: 'Safe movement patterns, body awareness, warmup discipline, and routine setup.',
+    },
+    {
+      id: 'consistency',
+      name: 'Consistency',
+      minHours: 20,
+      maxHours: 80,
+      minScale: 0.85,
+      maxScale: 1.00,
+      structureTier: 2,
+      description: 'Habit stabilization, baseline endurance, recovery management, and form refinement.',
+    },
+    {
+      id: 'technique',
+      name: 'Technique',
+      minHours: 80,
+      maxHours: 200,
+      minScale: 1.00,
+      maxScale: 1.15,
+      structureTier: 3,
+      description: 'Progressive overload, movement efficiency, and measurable physical conditioning.',
+    },
+    {
+      id: 'base-development',
+      name: 'Base Development',
+      minHours: 200,
+      maxHours: 450,
+      minScale: 1.15,
+      maxScale: 1.28,
+      structureTier: 4,
+      description: 'Athletic capacity, sport-specific conditioning, and resilient work capacity.',
+    },
+    {
+      id: 'advanced-development',
+      name: 'Advanced Development',
+      minHours: 450,
+      maxHours: 900,
+      minScale: 1.28,
+      maxScale: 1.40,
+      structureTier: 5,
+      description: 'Periodization, peak performance training, and fine-tuned biomechanics.',
+    },
+    {
+      id: 'long-term-performance',
+      name: 'Long-Term Performance',
+      minHours: 900,
+      maxHours: 10000,
+      minScale: 1.40,
+      maxScale: 1.48,
+      structureTier: 6,
+      description: 'Lifelong mastery, peak physical autonomy, and athletic sustainability.',
+    },
+  ],
+};
+
+// ── 6. Universal Generic Progression Profile ─────────────────────
+export const GENERIC_PROGRESSION_PROFILE: ProgressionProfile = {
+  id: 'profile-generic',
+  skillKey: 'generic',
+  title: 'Deliberate Practice Horizon',
+  category: 'generic',
+  sourceNote:
+    'Universal practice progression horizon. Practice time is an observable investment metric, not a guarantee of competence.',
+  isEvidenceInformed: false,
+  checkpoints: [25, 50, 100, 175, 250, 375, 500, 750, 1000],
+  stages: [
+    {
+      id: 'foundation',
+      name: 'Foundation',
+      minHours: 0,
+      maxHours: 25,
+      minScale: 0.70,
+      maxScale: 0.85,
+      structureTier: 1,
+      description: 'Initial fundamentals, orientation, and establishing practice routines.',
+    },
+    {
+      id: 'basic-fluency',
+      name: 'Basic Fluency',
+      minHours: 25,
+      maxHours: 100,
+      minScale: 0.85,
+      maxScale: 1.00,
+      structureTier: 2,
+      description: 'Consistent execution of primary techniques and basic problem solving.',
+    },
+    {
+      id: 'applied-practice',
+      name: 'Applied Practice',
+      minHours: 100,
+      maxHours: 250,
+      minScale: 1.00,
+      maxScale: 1.15,
+      structureTier: 3,
+      description: 'Independent small projects, contextual application, and error correction.',
+    },
+    {
+      id: 'intermediate-depth',
+      name: 'Intermediate Depth',
+      minHours: 250,
+      maxHours: 500,
+      minScale: 1.15,
+      maxScale: 1.28,
+      structureTier: 4,
+      description: 'Nuanced execution, deeper principles, and workflow efficiency.',
+    },
+    {
+      id: 'advanced-competence',
+      name: 'Advanced Competence',
+      minHours: 500,
+      maxHours: 1000,
+      minScale: 1.28,
+      maxScale: 1.40,
+      structureTier: 5,
+      description: 'Complex problem solving, high speed, and reliable applied skill.',
+    },
+    {
+      id: 'deep-mastery',
+      name: 'Deep Mastery',
+      minHours: 1000,
+      maxHours: 10000,
+      minScale: 1.40,
+      maxScale: 1.48,
+      structureTier: 6,
+      description: 'Years of dedicated practice, synthesis, and deep domain mastery.',
+    },
+  ],
+};
+
+// Aliases for backwards compatibility
+export const PYTHON_PROGRESSION_PROFILE = PROGRAMMING_PROGRESSION_PROFILE;
+export const DEFAULT_PROGRESSION_PROFILE = GENERIC_PROGRESSION_PROFILE;
+
 /**
- * Retrieve progression profile for a given skill
+ * Retrieve progression profile for a given skill and optional category
  */
-export function getProgressionProfile(skillName: string): ProgressionProfile {
-  const normalized = skillName.trim().toLowerCase();
-  if (normalized.includes('python') || normalized.includes('py')) {
-    return PYTHON_PROGRESSION_PROFILE;
+export function getProgressionProfile(
+  skillName: string,
+  category?: string,
+): ProgressionProfile {
+  // 1. Match by explicit category if provided
+  if (category) {
+    const cat = category.trim().toLowerCase();
+    if (cat === 'programming') return PROGRAMMING_PROGRESSION_PROFILE;
+    if (cat === 'language') return LANGUAGE_PROGRESSION_PROFILE;
+    if (cat === 'music') return MUSIC_PROGRESSION_PROFILE;
+    if (cat === 'creative') return CREATIVE_PROGRESSION_PROFILE;
+    if (cat === 'fitness') return FITNESS_PROGRESSION_PROFILE;
+    if (cat === 'generic') return GENERIC_PROGRESSION_PROFILE;
   }
-  return DEFAULT_PROGRESSION_PROFILE;
+
+  // 2. Intelligent keyword fallback inference
+  const name = skillName.trim().toLowerCase();
+
+  if (
+    name.includes('python') ||
+    name.includes('code') ||
+    name.includes('coding') ||
+    name.includes('react') ||
+    name.includes('typescript') ||
+    name.includes('rust') ||
+    name.includes('java') ||
+    name.includes('program') ||
+    name.includes('web')
+  ) {
+    return PROGRAMMING_PROGRESSION_PROFILE;
+  }
+
+  if (
+    name.includes('german') ||
+    name.includes('spanish') ||
+    name.includes('french') ||
+    name.includes('japanese') ||
+    name.includes('chinese') ||
+    name.includes('mandarin') ||
+    name.includes('korean') ||
+    name.includes('italian') ||
+    name.includes('russian') ||
+    name.includes('language')
+  ) {
+    return LANGUAGE_PROGRESSION_PROFILE;
+  }
+
+  if (
+    name.includes('guitar') ||
+    name.includes('piano') ||
+    name.includes('violin') ||
+    name.includes('drum') ||
+    name.includes('sing') ||
+    name.includes('music') ||
+    name.includes('bass')
+  ) {
+    return MUSIC_PROGRESSION_PROFILE;
+  }
+
+  if (
+    name.includes('draw') ||
+    name.includes('paint') ||
+    name.includes('sketch') ||
+    name.includes('art') ||
+    name.includes('design') ||
+    name.includes('write') ||
+    name.includes('writing') ||
+    name.includes('novel')
+  ) {
+    return CREATIVE_PROGRESSION_PROFILE;
+  }
+
+  if (
+    name.includes('run') ||
+    name.includes('running') ||
+    name.includes('gym') ||
+    name.includes('fitness') ||
+    name.includes('workout') ||
+    name.includes('swim') ||
+    name.includes('calisthenics') ||
+    name.includes('yoga')
+  ) {
+    return FITNESS_PROGRESSION_PROFILE;
+  }
+
+  return GENERIC_PROGRESSION_PROFILE;
 }
 
 /**
@@ -249,16 +633,17 @@ export function calculateLevelAura(level: number): {
 }
 
 /**
- * Calculate complete skill progression state from raw seconds & level
+ * Calculate complete skill progression state from raw seconds, level, and optional category
  */
 export function getSkillProgressionState(
   skillId: string,
   skillName: string,
   totalSeconds: number,
   level: number,
+  category?: string,
 ): SkillProgressionState {
   const totalHours = totalSeconds / 3600;
-  const profile = getProgressionProfile(skillName);
+  const profile = getProgressionProfile(skillName, category);
 
   // 1. Locate current stage
   let currentStage = profile.stages[0];
@@ -294,6 +679,7 @@ export function getSkillProgressionState(
     skillId,
     totalSeconds,
     totalHours,
+    category: profile.category,
     currentStage,
     stageProgressRatio,
     boundedVisualScale,

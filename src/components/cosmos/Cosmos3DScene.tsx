@@ -27,6 +27,7 @@ interface Cosmos3DSceneProps {
   nodes: SceneNodeData[];
   selectedNodeId?: string;
   onSelectNode: (node: SceneNodeData) => void;
+  onHoverNode?: (node: SceneNodeData | null) => void;
   globalLevel?: number;
   palette?: CorePalette;
   className?: string;
@@ -79,6 +80,7 @@ export function Cosmos3DScene({
   nodes,
   selectedNodeId,
   onSelectNode,
+  onHoverNode,
   globalLevel = 1,
   palette,
   className,
@@ -96,6 +98,11 @@ export function Cosmos3DScene({
   useEffect(() => {
     onSelectNodeRef.current = onSelectNode;
   }, [onSelectNode]);
+
+  const onHoverNodeRef = useRef(onHoverNode);
+  useEffect(() => {
+    onHoverNodeRef.current = onHoverNode;
+  }, [onHoverNode]);
 
   // Active Core Palette Ref for smooth in-loop color lerping (300-500ms)
   const activePalette = palette ?? getCorePalette();
@@ -123,7 +130,7 @@ export function Cosmos3DScene({
     const container = mountRef.current;
     if (!container) return;
 
-    // Initial container measurements (fallback to standard aspect ratio if hidden during initial tick)
+    // Initial container measurements
     const initialWidth = container.clientWidth || 800;
     const initialHeight = container.clientHeight || 600;
 
@@ -658,7 +665,6 @@ export function Cosmos3DScene({
       camera.aspect = aspect;
 
       // Responsive Camera Framing: Adapt camera Z distance on narrow aspect ratios
-      // so all skill nodes (at x = +-4.5) remain in viewport with proper margin
       const adaptedBaseZ = aspect < 1.35 ? 14.5 * (1.35 / Math.max(0.65, aspect)) : 14.5;
       baseCameraZRef.current = adaptedBaseZ;
 
@@ -728,11 +734,9 @@ export function Cosmos3DScene({
       camera.position.z = baseCameraZRef.current;
       camera.lookAt(0, 0, 0);
 
-      // ── Mastery Core Evident Multi-Speed Dynamics ───────────────
-      // A. Vertical floating hover (4.2s cycle, visible amplitude)
+      // ── Mastery Core Dynamics ────────────────────────────────────
       coreGroup.position.y = Math.sin(elapsedTime * 1.5) * 0.22;
 
-      // B. Differential Rotations
       crystalShell.rotation.y = elapsedTime * 0.45;
       crystalShell.rotation.x = Math.sin(elapsedTime * 0.3) * 0.25;
       latticeShell.rotation.y = -elapsedTime * 0.32;
@@ -740,12 +744,10 @@ export function Cosmos3DScene({
       innerCore.rotation.y = -elapsedTime * 0.75;
       innerCore.rotation.z = elapsedTime * 0.4;
 
-      // C. Emissive Breathing (Radiant Pulse)
       const pulseScale = 1.0 + Math.sin(elapsedTime * 2.5) * 0.08;
       innerCore.scale.set(pulseScale, pulseScale, pulseScale);
       innerMat.emissiveIntensity = 2.4 + Math.sin(elapsedTime * 2.0) * 0.9;
 
-      // D. Metallic Orbital Rings Continuous Multi-Axis Revolutions
       ring1.rotation.z = elapsedTime * 0.55;
       ring1.rotation.y = Math.PI / 6 + Math.sin(elapsedTime * 0.6) * 0.15;
 
@@ -755,18 +757,20 @@ export function Cosmos3DScene({
       ring3.rotation.y = elapsedTime * 0.32;
       ring3.rotation.z = -Math.PI / 3 + Math.sin(elapsedTime * 0.4) * 0.15;
 
-      // E. Deep Space Background Starfield & Planet Drift
       starField.rotation.y = elapsedTime * 0.035;
       deepStarField.rotation.y = -elapsedTime * 0.02;
       distantPlanetGroup.position.y = -9.5 + Math.sin(elapsedTime * 0.5) * 0.35;
 
-      // ── Asynchronous Node Drift & Continuous Energy Stream Updates
+      // ── Asynchronous Node Drift & Selection Visual Feedback ───────
       const activePulseCycle = 7.0; // 7s pulse period
       const pulseIndex = Math.floor(elapsedTime / activePulseCycle) % Math.max(1, curveStreams.length);
       const pulseProgress = (elapsedTime % activePulseCycle) / 1.8; // 1.8s travel duration
 
       const liveWidth = container.clientWidth || 800;
       const liveHeight = container.clientHeight || 600;
+
+      const selectedId = selectedNodeIdRef.current;
+      const hasActiveSelection = Boolean(selectedId);
 
       curveStreams.forEach((stream, idx) => {
         const group = nodeMeshes.get(stream.targetNodeId);
@@ -814,14 +818,24 @@ export function Cosmos3DScene({
           }
         } else {
           pulseMat.opacity = 0;
-          tubeMat.emissiveIntensity = 1.5;
         }
 
-        // Node Selection / Hover Scaling
-        const isSelected = selectedNodeIdRef.current === stream.targetNodeId;
+        // ── Selection Lighting & Aura Amplification ───────────────
+        const isSelected = selectedId === stream.targetNodeId;
         const isHovered = hoveredNodeIdRef.current === stream.targetNodeId;
-        const targetScale = isSelected ? 1.28 : isHovered ? 1.16 : 1.0;
+        const targetScale = isSelected ? 1.30 : isHovered ? 1.18 : 1.0;
         group.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.1);
+
+        if (isSelected) {
+          tubeMat.opacity = 0.65;
+          tubeMat.emissiveIntensity = 2.8;
+        } else if (hasActiveSelection) {
+          tubeMat.opacity = 0.20;
+          tubeMat.emissiveIntensity = 0.85;
+        } else {
+          tubeMat.opacity = 0.38;
+          tubeMat.emissiveIntensity = 1.5;
+        }
 
         // Rotate child rings
         group.children.forEach((child) => {
@@ -830,7 +844,7 @@ export function Cosmos3DScene({
           }
         });
 
-        // ── E. Direct DOM Transform Update (Synced to Live Container) ────
+        // ── E. Direct DOM Transform Update ────────────────────────
         const labelEl = labelElsRef.current.get(stream.targetNodeId);
         if (labelEl) {
           const worldPos = new THREE.Vector3();
@@ -890,9 +904,11 @@ export function Cosmos3DScene({
             onClick={() => onSelectNode(node)}
             onMouseEnter={() => {
               hoveredNodeIdRef.current = node.id;
+              onHoverNodeRef.current?.(node);
             }}
             onMouseLeave={() => {
               hoveredNodeIdRef.current = null;
+              onHoverNodeRef.current?.(null);
             }}
             style={{
               left: '0px',
@@ -903,6 +919,15 @@ export function Cosmos3DScene({
             className={cn(
               'absolute z-30 cursor-pointer pointer-events-auto transition-shadow duration-300 ease-out group',
             )}
+            tabIndex={0}
+            role="button"
+            aria-label={`View Skill Journey for ${node.name}`}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onSelectNode(node);
+              }
+            }}
           >
             <div className="relative flex flex-col items-center">
               {/* Hitbox Area */}
@@ -914,7 +939,7 @@ export function Cosmos3DScene({
                   'px-2.5 py-1 rounded-xl flex items-center gap-1.5',
                   'bg-surface/90 border backdrop-blur-md shadow-xl transition-all duration-300',
                   isSelected
-                    ? 'border-accent/90 text-zinc-50 shadow-[0_0_16px_rgba(129,140,248,0.5)] ring-1 ring-accent/60 scale-105'
+                    ? 'border-accent/90 text-zinc-50 shadow-[0_0_18px_rgba(129,140,248,0.6)] ring-1 ring-accent/60 scale-105'
                     : 'border-edge/70 text-zinc-200 hover:border-zinc-300 hover:text-white',
                 )}
               >

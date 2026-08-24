@@ -7,11 +7,20 @@ export interface User {
   createdAt: string;
 }
 
+export type SkillCategory =
+  | 'programming'
+  | 'language'
+  | 'music'
+  | 'creative'
+  | 'fitness'
+  | 'generic';
+
 export interface Skill {
   id: string;
   userId: string;
   name: string;
   description: string;
+  category?: SkillCategory;
   icon: string;
   color: string;
   targetHours: number;
@@ -87,6 +96,7 @@ export type ActiveView = 'dashboard' | 'timer' | 'history' | 'settings';
 export interface NewSkillData {
   name: string;
   description: string;
+  category?: SkillCategory;
   icon: string;
   color: string;
   targetHours: number;

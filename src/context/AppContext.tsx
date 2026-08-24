@@ -69,6 +69,7 @@ interface AppContextValue {
   // Skills
   createSkill: (data: NewSkillData) => void;
   archiveSkill: (skillId: string) => void;
+  deleteSkill: (skillId: string) => void;
 
   // Celebration & Rewards
   celebration: CelebrationData | null;
@@ -354,6 +355,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [user, loadData],
   );
 
+  const handleDeleteSkill = useCallback(
+    (skillId: string) => {
+      if (!user) return;
+      db.deleteSkill(user.id, skillId);
+      loadData();
+    },
+    [user, loadData],
+  );
+
   // ── Celebration & Reward Dismissal ────────────────────────
 
   const dismissCelebration = useCallback(() => {
@@ -396,6 +406,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         cancelTimer,
         createSkill: handleCreateSkill,
         archiveSkill: handleArchiveSkill,
+        deleteSkill: handleDeleteSkill,
         celebration,
         dismissCelebration,
         sessionReward,

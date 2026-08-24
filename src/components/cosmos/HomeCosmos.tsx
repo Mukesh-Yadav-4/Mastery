@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Cosmos3DScene, type SceneNodeData } from './Cosmos3DScene';
 import { CosmicHUD } from './CosmicHUD';
+import { SkillJourneyPanel } from './SkillJourneyPanel';
+import { SkillNodePreview } from './SkillNodePreview';
 import { formatDuration } from '../../utils/calculations';
 import { getSkillProgressionState } from '../../utils/progression';
 import type { CosmicNodeData } from './CosmicNode';
@@ -27,6 +29,7 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
         sp.skill.name,
         sp.totalSeconds,
         sp.skillLevel.level,
+        sp.skill.category,
       );
 
       return {
@@ -50,7 +53,13 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
     return sceneNodes[0]?.id ?? '';
   });
 
-  // Keep selection synchronized with real skills list
+  // Hovered node state for lightweight preview
+  const [hoveredNode, setHoveredNode] = useState<SceneNodeData | null>(null);
+
+  // Skill Journey deep interpretation panel open state
+  const [isJourneyOpen, setIsJourneyOpen] = useState(false);
+
+  // Keep selection synchronized with real skills list (resets cleanly when a skill is deleted)
   const activeSelectedId = sceneNodes.some((n) => n.id === selectedNodeId)
     ? selectedNodeId
     : sceneNodes[0]?.id ?? '';
@@ -69,11 +78,17 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
     return hudNode;
   }, [sceneNodes, activeSelectedId]);
 
+  const handleSelectNode = (node: SceneNodeData) => {
+    setSelectedNodeId(node.id);
+    setIsJourneyOpen(true);
+  };
+
   const handleStartFocus = (skillId: string) => {
     if (!skillId) {
       onOpenCreateSkill();
       return;
     }
+    setIsJourneyOpen(false);
     startTimer(skillId);
   };
 
@@ -87,8 +102,8 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
         <div className="absolute bottom-10 right-10 w-[350px] h-[350px] rounded-full bg-cyan-950/25 blur-[110px] opacity-50" />
       </div>
 
-      {/* ── 3D WebGL Cosmic Growth Scene ───────────────────────── */}
-      <div className="relative w-full h-[520px] sm:h-[620px] lg:h-[680px]">
+      {/* ── 3D WebGL Cosmic Growth Scene Viewport (Fullscreen Dominated) ── */}
+      <div className="relative w-full h-[calc(100dvh-7.5rem)] min-h-[580px] max-h-[900px]">
         {/* Floating Holographic HUD */}
         <CosmicHUD
           levelInfo={globalLevelInfo}
@@ -99,7 +114,24 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
           palette={corePalette}
           onStartFocus={handleStartFocus}
           onOpenCreateSkill={onOpenCreateSkill}
+          onOpenJourney={() => setIsJourneyOpen(true)}
         />
+
+        {/* Hover Node Contextual Preview */}
+        {!isJourneyOpen && hoveredNode && (
+          <div className="absolute top-16 sm:top-20 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
+            <SkillNodePreview node={hoveredNode} />
+          </div>
+        )}
+
+        {/* Interactive Full Skill Journey Panel */}
+        {isJourneyOpen && selectedNode && (
+          <SkillJourneyPanel
+            node={selectedNode}
+            onClose={() => setIsJourneyOpen(false)}
+            onStartFocus={handleStartFocus}
+          />
+        )}
 
         {/* Zero-Skill Empty State Prompt Overlay */}
         {!hasSkills && (
@@ -118,7 +150,7 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
                 variant="primary"
                 size="md"
                 onClick={onOpenCreateSkill}
-                className="w-full font-bold gap-2 shadow-[0_0_18px_rgba(129,140,248,0.4)]"
+                className="w-full font-bold gap-2 shadow-[0_0_18px_rgba(129,140,248,0.4)] cursor-pointer"
               >
                 <Plus size={16} />
                 <span>Create Your First Skill</span>
@@ -131,7 +163,8 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
         <Cosmos3DScene
           nodes={sceneNodes}
           selectedNodeId={activeSelectedId}
-          onSelectNode={(node) => setSelectedNodeId(node.id)}
+          onSelectNode={handleSelectNode}
+          onHoverNode={setHoveredNode}
           globalLevel={globalLevelInfo.level}
           palette={corePalette}
           className="w-full h-full"

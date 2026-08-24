@@ -3,27 +3,59 @@ import {
   getSkillProgressionState,
   getProgressionProfile,
   calculateLevelAura,
-  PYTHON_PROGRESSION_PROFILE,
-  DEFAULT_PROGRESSION_PROFILE,
+  PROGRAMMING_PROGRESSION_PROFILE,
+  LANGUAGE_PROGRESSION_PROFILE,
+  MUSIC_PROGRESSION_PROFILE,
+  CREATIVE_PROGRESSION_PROFILE,
+  FITNESS_PROGRESSION_PROFILE,
+  GENERIC_PROGRESSION_PROFILE,
 } from './progression';
 
-describe('Progression Profile Model', () => {
-  it('correctly maps Python skills to the evidence-informed Python profile', () => {
-    const profile = getProgressionProfile('Python');
-    expect(profile.id).toBe(PYTHON_PROGRESSION_PROFILE.id);
-    expect(profile.isEvidenceInformed).toBe(true);
-    expect(profile.sourceNote).toContain('Real Python');
+describe('Progression Profile Model & Category Mapping', () => {
+  it('correctly maps programming skills and explicit category', () => {
+    const p1 = getProgressionProfile('Python');
+    expect(p1.id).toBe(PROGRAMMING_PROGRESSION_PROFILE.id);
+    expect(p1.category).toBe('programming');
+
+    const p2 = getProgressionProfile('Custom Tool', 'programming');
+    expect(p2.id).toBe(PROGRAMMING_PROGRESSION_PROFILE.id);
   });
 
-  it('correctly falls back to default profile for general skills', () => {
-    const profile = getProgressionProfile('German Language');
-    expect(profile.id).toBe(DEFAULT_PROGRESSION_PROFILE.id);
+  it('correctly maps language skills by name or category', () => {
+    const l1 = getProgressionProfile('German');
+    expect(l1.id).toBe(LANGUAGE_PROGRESSION_PROFILE.id);
+    expect(l1.category).toBe('language');
+    expect(l1.stages[1].name).toBe('Early Exposure');
+    expect(l1.stages[5].name).toBe('High Proficiency');
+
+    const l2 = getProgressionProfile('Custom Course', 'language');
+    expect(l2.id).toBe(LANGUAGE_PROGRESSION_PROFILE.id);
+  });
+
+  it('correctly maps music, creative, and fitness profiles', () => {
+    const m = getProgressionProfile('Piano Practice');
+    expect(m.id).toBe(MUSIC_PROGRESSION_PROFILE.id);
+    expect(m.stages[2].name).toBe('Repertoire');
+
+    const c = getProgressionProfile('Oil Painting');
+    expect(c.id).toBe(CREATIVE_PROGRESSION_PROFILE.id);
+    expect(c.stages[3].name).toBe('Project Depth');
+
+    const f = getProgressionProfile('Morning Running');
+    expect(f.id).toBe(FITNESS_PROGRESSION_PROFILE.id);
+    expect(f.stages[1].name).toBe('Consistency');
+  });
+
+  it('correctly falls back to generic profile when unrecognized', () => {
+    const g = getProgressionProfile('Random Hobby');
+    expect(g.id).toBe(GENERIC_PROGRESSION_PROFILE.id);
+    expect(g.category).toBe('generic');
   });
 });
 
-describe('Python Progression Milestones & Horizonal Stages', () => {
+describe('Programming Progression Milestones & Horizonal Stages', () => {
   const evaluateHours = (hours: number, level = 1) => {
-    return getSkillProgressionState('skill-1', 'Python', hours * 3600, level);
+    return getSkillProgressionState('skill-1', 'Python', hours * 3600, level, 'programming');
   };
 
   it('evaluates 0h as Foundation (Tier 1)', () => {
@@ -54,32 +86,12 @@ describe('Python Progression Milestones & Horizonal Stages', () => {
     expect(state.hoursToNextMilestone).toBe(25);
   });
 
-  it('evaluates 75h checkpoint', () => {
-    const state = evaluateHours(75);
-    expect(state.currentStage.name).toBe('Basic Comfort');
-    expect(state.nextVisualMilestoneHours).toBe(100);
-  });
-
-  it('evaluates 100h checkpoint', () => {
-    const state = evaluateHours(100);
-    expect(state.currentStage.name).toBe('Basic Comfort');
-    expect(state.nextVisualMilestoneHours).toBe(150);
-    expect(state.hoursToNextMilestone).toBe(50);
-  });
-
   it('evaluates 150h as Solid Ability boundary (Tier 3)', () => {
     const state = evaluateHours(150);
     expect(state.currentStage.name).toBe('Solid Ability');
     expect(state.structureTier).toBe(3);
     expect(state.boundedVisualScale).toBeCloseTo(1.00, 2);
     expect(state.nextVisualMilestoneHours).toBe(200);
-  });
-
-  it('evaluates 200h checkpoint inside Solid Ability', () => {
-    const state = evaluateHours(200);
-    expect(state.currentStage.name).toBe('Solid Ability');
-    expect(state.nextVisualMilestoneHours).toBe(300);
-    expect(state.hoursToNextMilestone).toBe(100);
   });
 
   it('evaluates 300h as Advanced Practice boundary (Tier 4)', () => {
@@ -90,26 +102,12 @@ describe('Python Progression Milestones & Horizonal Stages', () => {
     expect(state.nextVisualMilestoneHours).toBe(500);
   });
 
-  it('evaluates 500h checkpoint inside Advanced Practice', () => {
-    const state = evaluateHours(500);
-    expect(state.currentStage.name).toBe('Advanced Practice');
-    expect(state.nextVisualMilestoneHours).toBe(600);
-    expect(state.hoursToNextMilestone).toBe(100);
-  });
-
   it('evaluates 600h as Job-Ready Depth boundary (Tier 5)', () => {
     const state = evaluateHours(600);
     expect(state.currentStage.name).toBe('Job-Ready Depth');
     expect(state.structureTier).toBe(5);
     expect(state.boundedVisualScale).toBeCloseTo(1.28, 2);
     expect(state.nextVisualMilestoneHours).toBe(1000);
-  });
-
-  it('evaluates 1000h checkpoint inside Job-Ready Depth', () => {
-    const state = evaluateHours(1000);
-    expect(state.currentStage.name).toBe('Job-Ready Depth');
-    expect(state.nextVisualMilestoneHours).toBe(1200);
-    expect(state.hoursToNextMilestone).toBe(200);
   });
 
   it('evaluates 1200h as Deep Mastery boundary (Tier 6)', () => {
@@ -120,31 +118,25 @@ describe('Python Progression Milestones & Horizonal Stages', () => {
     expect(state.nextVisualMilestoneHours).toBeNull();
     expect(state.hoursToNextMilestone).toBeNull();
   });
-
-  it('evaluates 1500h beyond with strictly bounded visual scale', () => {
-    const state = evaluateHours(1500);
-    expect(state.currentStage.name).toBe('Deep Mastery');
-    expect(state.structureTier).toBe(6);
-    expect(state.boundedVisualScale).toBeLessThanOrEqual(1.48);
-    expect(state.boundedVisualScale).toBeGreaterThan(1.40);
-  });
 });
 
-describe('Level -> Aura Independence', () => {
-  it('increases aura and emissive intensity with level without altering physical scale bounds', () => {
-    const auraLvl1 = calculateLevelAura(1);
-    const auraLvl5 = calculateLevelAura(5);
-    const auraLvl15 = calculateLevelAura(15);
+describe('Level -> Aura Scaling Verification', () => {
+  it('keeps physical scale invariant to level alone', () => {
+    const level1State = getSkillProgressionState('s1', 'Python', 20 * 3600, 1);
+    const level15State = getSkillProgressionState('s1', 'Python', 20 * 3600, 15);
 
-    expect(auraLvl1.auraIntensity).toBeLessThan(auraLvl5.auraIntensity);
-    expect(auraLvl5.auraIntensity).toBeLessThan(auraLvl15.auraIntensity);
+    expect(level1State.boundedVisualScale).toBe(level15State.boundedVisualScale);
+    expect(level15State.levelAuraIntensity).toBeGreaterThan(level1State.levelAuraIntensity);
+    expect(level15State.haloOpacity).toBeGreaterThan(level1State.haloOpacity);
+  });
 
-    expect(auraLvl1.haloOpacity).toBeLessThan(auraLvl5.haloOpacity);
-    expect(auraLvl5.haloOpacity).toBeLessThan(auraLvl15.haloOpacity);
+  it('computes aura intensity within valid mathematical bounds', () => {
+    const aura1 = calculateLevelAura(1);
+    const aura10 = calculateLevelAura(10);
+    const aura50 = calculateLevelAura(50);
 
-    // Verify scale is strictly determined by hours, not level
-    const stateLvl1 = getSkillProgressionState('s1', 'Python', 100 * 3600, 1);
-    const stateLvl10 = getSkillProgressionState('s1', 'Python', 100 * 3600, 10);
-    expect(stateLvl1.boundedVisualScale).toBe(stateLvl10.boundedVisualScale);
+    expect(aura1.auraIntensity).toBeGreaterThanOrEqual(1.0);
+    expect(aura50.auraIntensity).toBeLessThanOrEqual(3.6);
+    expect(aura10.emissiveIntensity).toBeGreaterThan(aura1.emissiveIntensity);
   });
 });

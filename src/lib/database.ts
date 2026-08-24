@@ -192,6 +192,7 @@ export function createSkill(userId: string, data: NewSkillData): Skill {
     userId,
     name: data.name.trim(),
     description: data.description.trim(),
+    category: data.category || 'generic',
     icon: data.icon,
     color: data.color,
     targetHours: data.targetHours,
@@ -214,6 +215,35 @@ export function archiveSkill(userId: string, skillId: string): void {
       : s,
   );
   writeJson(STORAGE_KEYS.SKILLS, updated);
+}
+
+export function deleteSkill(userId: string, skillId: string): void {
+  // 1. Remove the skill
+  const skills = readJson<Skill[]>(STORAGE_KEYS.SKILLS, []);
+  const filteredSkills = skills.filter(
+    (s) => !(s.id === skillId && s.userId === userId),
+  );
+  writeJson(STORAGE_KEYS.SKILLS, filteredSkills);
+
+  // 2. Remove associated sessions
+  const sessions = readJson<FocusSession[]>(STORAGE_KEYS.SESSIONS, []);
+  const filteredSessions = sessions.filter(
+    (sess) => !(sess.skillId === skillId && sess.userId === userId),
+  );
+  writeJson(STORAGE_KEYS.SESSIONS, filteredSessions);
+
+  // 3. Remove associated milestones
+  const milestones = readJson<MilestoneRecord[]>(STORAGE_KEYS.MILESTONES, []);
+  const filteredMilestones = milestones.filter(
+    (m) => !(m.skillId === skillId && m.userId === userId),
+  );
+  writeJson(STORAGE_KEYS.MILESTONES, filteredMilestones);
+
+  // 4. If active timer is running on this deleted skill, clear it
+  const activeTimer = readJson<TimerState | null>(STORAGE_KEYS.ACTIVE_TIMER, null);
+  if (activeTimer && activeTimer.skillId === skillId) {
+    localStorage.removeItem(STORAGE_KEYS.ACTIVE_TIMER);
+  }
 }
 
 // ── Sessions ──────────────────────────────────────────────────

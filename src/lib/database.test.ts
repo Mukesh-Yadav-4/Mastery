@@ -7,6 +7,7 @@ import {
   createSkill,
   getSkills,
   archiveSkill,
+  deleteSkill,
   createSession,
   getSessions,
   checkAndCreateMilestones,
@@ -175,6 +176,50 @@ describe('Skills', () => {
 
     archiveSkill(userId, skill.id);
     expect(getSkills(userId)).toHaveLength(0);
+  });
+
+  it('creates skill with specified category and defaults to generic', () => {
+    const s1 = createSkill(userId, {
+      name: 'Python',
+      description: '',
+      category: 'programming',
+      icon: '🐍',
+      color: '#3b82f6',
+      targetHours: 100,
+    });
+    expect(s1.category).toBe('programming');
+
+    const s2 = createSkill(userId, {
+      name: 'Meditation',
+      description: '',
+      icon: '🧘',
+      color: '#8b5cf6',
+      targetHours: 50,
+    });
+    expect(s2.category).toBe('generic');
+  });
+
+  it('deletes a skill and removes associated sessions and milestones', () => {
+    const skill = createSkill(userId, {
+      name: 'Temporary Skill',
+      description: '',
+      icon: '⚡',
+      color: '#ef4444',
+      targetHours: 10,
+    });
+
+    createSession(userId, skill.id, Date.now() - 3600000, Date.now(), 3600);
+    checkAndCreateMilestones(userId, skill.id, 10, 10);
+
+    expect(getSkills(userId)).toHaveLength(1);
+    expect(getSessions(userId)).toHaveLength(1);
+    expect(getMilestones(userId).length).toBeGreaterThan(0);
+
+    deleteSkill(userId, skill.id);
+
+    expect(getSkills(userId)).toHaveLength(0);
+    expect(getSessions(userId)).toHaveLength(0);
+    expect(getMilestones(userId)).toHaveLength(0);
   });
 });
 

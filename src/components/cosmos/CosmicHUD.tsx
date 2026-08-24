@@ -4,6 +4,7 @@ import { Button } from '../ui/Button';
 import { Zap, Clock, Flame, Sparkles, Play, Target, Compass } from 'lucide-react';
 
 import type { CorePalette } from '../../utils/palettes';
+import { cn } from '../../lib/utils';
 
 interface CosmicHUDProps {
   levelInfo: LevelInfo;
@@ -14,6 +15,7 @@ interface CosmicHUDProps {
   palette?: CorePalette;
   onStartFocus: (skillId: string) => void;
   onOpenCreateSkill: () => void;
+  onOpenJourney?: () => void;
 }
 
 export function CosmicHUD({
@@ -25,6 +27,7 @@ export function CosmicHUD({
   palette,
   onStartFocus,
   onOpenCreateSkill,
+  onOpenJourney,
 }: CosmicHUDProps) {
   const {
     level,
@@ -155,9 +158,24 @@ export function CosmicHUD({
       <div className="absolute bottom-2.5 sm:bottom-3 inset-x-3 sm:inset-x-4 z-40 max-w-lg mx-auto pointer-events-auto">
         <div className="rounded-2xl bg-surface/90 border border-edge/80 px-3 py-2 sm:px-3.5 sm:py-2.5 backdrop-blur-md shadow-2xl shadow-black/70 flex items-center justify-between gap-2.5 transition-all">
           {/* Selected Focus Skill Summary */}
-          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          <div
+            onClick={selectedNode ? onOpenJourney : undefined}
+            className={cn(
+              'flex items-center gap-2.5 min-w-0 flex-1',
+              selectedNode ? 'cursor-pointer group hover:opacity-90 transition-opacity' : '',
+            )}
+            title={selectedNode ? `Open ${selectedNode.name} Journey` : undefined}
+            role={selectedNode ? 'button' : undefined}
+            tabIndex={selectedNode ? 0 : undefined}
+            onKeyDown={(e) => {
+              if (selectedNode && (e.key === 'Enter' || e.key === ' ')) {
+                e.preventDefault();
+                onOpenJourney?.();
+              }
+            }}
+          >
             <div
-              className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0 border border-white/10 shadow-inner"
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0 border border-white/10 shadow-inner group-hover:scale-105 transition-transform"
               style={{
                 backgroundColor: selectedNode ? `${selectedNode.color}25` : 'rgba(129,140,248,0.2)',
               }}
@@ -167,7 +185,7 @@ export function CosmicHUD({
 
             <div className="min-w-0 space-y-0.5">
               <div className="flex items-center gap-1.5 truncate">
-                <h4 className="text-xs sm:text-sm font-bold text-zinc-100 truncate">
+                <h4 className="text-xs sm:text-sm font-bold text-zinc-100 truncate group-hover:text-accent transition-colors">
                   {selectedNode ? selectedNode.name : 'Cosmos Core'}
                 </h4>
                 {progression && (
