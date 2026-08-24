@@ -1,8 +1,18 @@
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useApp } from '../../context/AppContext';
 import { cn } from '../../lib/utils';
-import { LogOut, LayoutDashboard, History, User, Compass } from 'lucide-react';
+import {
+  LogOut,
+  LayoutDashboard,
+  History,
+  User,
+  Compass,
+  Volume2,
+  VolumeX,
+} from 'lucide-react';
 import type { ActiveView } from '../../types';
+import { soundEngine, AMBIENT_TRACKS, type AmbientTrackId } from '../../utils/audio';
 
 interface NavItem {
   view: ActiveView;
@@ -25,6 +35,29 @@ export function AppShell({
 }) {
   const { signOut } = useAuth();
   const { activeView, setActiveView, activeTimer } = useApp();
+  const [isAmbienceOn, setIsAmbienceOn] = useState(() =>
+    soundEngine.getIsAmbienceActive(),
+  );
+  const [activeTrack, setActiveTrack] = useState<AmbientTrackId>(() =>
+    soundEngine.getActiveTrackId(),
+  );
+
+  useEffect(() => {
+    const unsubAudio = soundEngine.subscribeAmbience((playing) =>
+      setIsAmbienceOn(playing),
+    );
+    const unsubTrack = soundEngine.subscribeTrack((trackId) =>
+      setActiveTrack(trackId),
+    );
+    return () => {
+      unsubAudio();
+      unsubTrack();
+    };
+  }, []);
+
+  const handleToggleAmbience = () => {
+    soundEngine.toggleAmbience();
+  };
 
   // Hide shell when timer is active (immersive mode)
   if (activeTimer) {
@@ -70,6 +103,54 @@ export function AppShell({
                 {item.label}
               </button>
             ))}
+          </div>
+
+          {/* Ambient Cosmic Soundscape Button & Track Switcher */}
+          <div className="flex items-center rounded-xl bg-white/[0.03] border border-white/[0.08] p-0.5">
+            <button
+              type="button"
+              onClick={handleToggleAmbience}
+              className={cn(
+                'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer',
+                isAmbienceOn
+                  ? 'bg-accent/20 text-accent shadow-[0_0_12px_rgba(129,140,248,0.3)]'
+                  : 'text-zinc-400 hover:text-zinc-200',
+              )}
+              title={isAmbienceOn ? 'Mute Ambience' : 'Play Ambience'}
+            >
+              {isAmbienceOn ? (
+                <>
+                  <Volume2 size={13} className="text-accent animate-pulse" />
+                  <span className="hidden sm:inline font-semibold">
+                    {AMBIENT_TRACKS.find((t) => t.id === activeTrack)?.shortName ?? 'Music'}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <VolumeX size={13} className="text-zinc-500" />
+                  <span className="hidden sm:inline">Ambience</span>
+                </>
+              )}
+            </button>
+
+            {/* Quick Track Switcher Pill */}
+            {isAmbienceOn && (
+              <button
+                type="button"
+                onClick={() => {
+                  const currentIndex = AMBIENT_TRACKS.findIndex(
+                    (t) => t.id === activeTrack,
+                  );
+                  const nextTrack =
+                    AMBIENT_TRACKS[(currentIndex + 1) % AMBIENT_TRACKS.length];
+                  soundEngine.setTrack(nextTrack.id);
+                }}
+                className="px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-all cursor-pointer"
+                title={`Next: ${AMBIENT_TRACKS[(AMBIENT_TRACKS.findIndex((t) => t.id === activeTrack) + 1) % AMBIENT_TRACKS.length].name}`}
+              >
+                Track ⇄
+              </button>
+            )}
           </div>
 
           {onNavigateLanding && (

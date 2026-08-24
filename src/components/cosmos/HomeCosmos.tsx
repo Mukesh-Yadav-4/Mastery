@@ -10,9 +10,13 @@ import { getSkillProgressionState } from '../../utils/progression';
 import type { CosmicNodeData } from './CosmicNode';
 import { Plus, Sparkles } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { CosmicDevTools } from '../dev/CosmicDevTools';
+import { StartFocusModal } from '../focus/StartFocusModal';
+import type { Skill } from '../../types';
 
 export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => void }) {
   const {
+    skills,
     skillProgress,
     totalSeconds,
     streak,
@@ -24,6 +28,8 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
     dismissFeedback,
   } = useApp();
 
+  const [focusLauncherSkill, setFocusLauncherSkill] = useState<Skill | null>(null);
+
   const [feedbackPhase, setFeedbackPhase] = useState<
     'idle' | 'focus' | 'core_charge' | 'transfer' | 'absorption' | 'reveal' | 'settled'
   >('idle');
@@ -31,13 +37,24 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
   // Map ONLY real active user skills into 3D scene node data with progression profiles
   const sceneNodes: SceneNodeData[] = useMemo(() => {
     return skillProgress.map((sp) => {
+      // If there's an active feedback event for this skill, hold at pre-completion state until user presses Continue
+      const isTargetOfFeedback =
+        activeFeedbackEvent && activeFeedbackEvent.skillId === sp.skill.id;
+      const effectiveSeconds = isTargetOfFeedback
+        ? activeFeedbackEvent.previousSeconds
+        : sp.totalSeconds;
+      const effectiveLevel = isTargetOfFeedback
+        ? activeFeedbackEvent.previousSkillLevel.level
+        : sp.skillLevel.level;
+
       const progression = getSkillProgressionState(
         sp.skill.id,
         sp.skill.name,
-        sp.totalSeconds,
-        sp.skillLevel.level,
+        effectiveSeconds,
+        effectiveLevel,
         sp.skill.category,
         sp.skill.targetHours,
+        sp.skill.color,
       );
 
       return {
@@ -45,16 +62,24 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
         name: sp.skill.name,
         icon: sp.skill.icon,
         color: sp.skill.color,
-        level: sp.skillLevel.level,
-        xp: sp.skillXP,
-        totalHours: sp.totalHours,
-        formattedDuration: formatDuration(sp.totalSeconds),
+        level: effectiveLevel,
+        xp: isTargetOfFeedback
+          ? sp.skillXP - activeFeedbackEvent.xpEarned
+          : sp.skillXP,
+        totalHours: effectiveSeconds / 3600,
+        formattedDuration: formatDuration(effectiveSeconds),
         targetHours: sp.skill.targetHours,
-        percentage: sp.percentage,
+        percentage:
+          sp.skill.targetHours > 0
+            ? Math.min(
+                100,
+                (effectiveSeconds / (sp.skill.targetHours * 3600)) * 100,
+              )
+            : 0,
         progression,
       };
     });
-  }, [skillProgress]);
+  }, [skillProgress, activeFeedbackEvent]);
 
   // Selected node state
   const [selectedNodeId, setSelectedNodeId] = useState<string>(() => {
@@ -107,8 +132,20 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
       onOpenCreateSkill();
       return;
     }
-    setIsJourneyOpen(false);
-    startTimer(skillId);
+    const skill = skills.find((s) => s.id === skillId) || null;
+    if (skill) {
+      setIsJourneyOpen(false);
+      setFocusLauncherSkill(skill);
+    }
+  };
+
+  const handleConfirmStartFocus = (
+    skillId: string,
+    intention?: string,
+    targetDurationSeconds?: number | null,
+  ) => {
+    setFocusLauncherSkill(null);
+    startTimer(skillId, intention, targetDurationSeconds);
   };
 
   const hasSkills = sceneNodes.length > 0;
@@ -151,6 +188,14 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
             onStartFocus={handleStartFocus}
           />
         )}
+
+        {/* Deliberate Practice Start Focus Modal */}
+        <StartFocusModal
+          open={Boolean(focusLauncherSkill)}
+          skill={focusLauncherSkill}
+          onClose={() => setFocusLauncherSkill(null)}
+          onStart={handleConfirmStartFocus}
+        />
 
         {/* Cinematic Feedback Reward Overlay (Appears on Reveal/Settled phase) */}
         {activeFeedbackEvent &&
@@ -204,6 +249,9 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
           onFeedbackPhaseChange={setFeedbackPhase}
           className="w-full h-full"
         />
+
+        {/* Development-Only Cinematic Preview & Simulation Tooling */}
+        <CosmicDevTools />
       </div>
     </section>
   );

@@ -1,13 +1,22 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
-import { ProgressRing } from '../ui/ProgressRing';
 import { Button } from '../ui/Button';
 import { cn } from '../../lib/utils';
 import { formatTimerDisplay, formatHoursMinutes } from '../../utils/calculations';
 import { MIN_SESSION_DURATION_SECONDS } from '../../lib/constants';
-import { Pause, Play, Square, X } from 'lucide-react';
-
+import {
+  Pause,
+  Play,
+  CheckCircle2,
+  X,
+  Sparkles,
+  Target,
+  Edit2,
+  Clock,
+} from 'lucide-react';
 import { soundEngine } from '../../utils/audio';
+import { SessionReflectionModal } from '../sessions/SessionReflectionModal';
+import type { SessionReflection } from '../../types';
 
 export function FocusTimer() {
   const {
@@ -17,11 +26,9 @@ export function FocusTimer() {
     pauseTimer,
     resumeTimer,
     completeTimer,
+    updateTimerIntention,
     cancelTimer,
   } = useApp();
-
-  const [elapsed, setElapsed] = useState(0);
-  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   // Calculate elapsed seconds from timestamps
   const getElapsedSeconds = useCallback((): number => {
@@ -35,24 +42,41 @@ export function FocusTimer() {
       effectiveEnd = activeTimer.pausedAt;
     }
 
-    const totalMs = effectiveEnd - activeTimer.startedAt - activeTimer.totalPausedMs;
+    const totalMs =
+      effectiveEnd - activeTimer.startedAt - activeTimer.totalPausedMs;
     return Math.max(0, Math.floor(totalMs / 1000));
   }, [activeTimer]);
 
+  const [elapsed, setElapsed] = useState(() => {
+    if (!activeTimer) return 0;
+    const now = Date.now();
+    const effectiveEnd =
+      activeTimer.status === 'paused' && activeTimer.pausedAt
+        ? activeTimer.pausedAt
+        : now;
+    const totalMs =
+      effectiveEnd - activeTimer.startedAt - activeTimer.totalPausedMs;
+    return Math.max(0, Math.floor(totalMs / 1000));
+  });
+
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [showReflectionModal, setShowReflectionModal] = useState(false);
+  const [isEditingIntention, setIsEditingIntention] = useState(false);
+  const [editedIntention, setEditedIntention] = useState('');
+  const editInputRef = useRef<HTMLInputElement | null>(null);
+
   // Update elapsed display
   useEffect(() => {
-    setElapsed(getElapsedSeconds());
-
     if (!activeTimer || activeTimer.status !== 'running') return;
 
     const interval = setInterval(() => {
       setElapsed(getElapsedSeconds());
-    }, 200); // Update slightly faster than 1s for smoother display
+    }, 250);
 
     return () => clearInterval(interval);
   }, [activeTimer, getElapsedSeconds]);
 
-  // Handle page visibility change — recalculate on return
+  // Handle page visibility change
   useEffect(() => {
     function handleVisibility() {
       if (document.visibilityState === 'visible') {
@@ -64,6 +88,12 @@ export function FocusTimer() {
     return () =>
       document.removeEventListener('visibilitychange', handleVisibility);
   }, [getElapsedSeconds]);
+
+  useEffect(() => {
+    if (activeTimer?.intention) {
+      setEditedIntention(activeTimer.intention);
+    }
+  }, [activeTimer?.intention]);
 
   if (!activeTimer) return null;
 
@@ -77,12 +107,15 @@ export function FocusTimer() {
   const isRunning = activeTimer.status === 'running';
   const isPaused = activeTimer.status === 'paused';
   const canComplete = elapsed >= MIN_SESSION_DURATION_SECONDS;
+  const targetDuration = activeTimer.targetDurationSeconds ?? null;
 
-  // Calculate what progress would be after this session
+  // Calculate projected session progress ratio
   const currentTotalSeconds = progress?.totalSeconds ?? 0;
   const projectedTotalSeconds = currentTotalSeconds + elapsed;
   const projectedPercentage = Math.min(
-    skill.targetHours > 0 ? (projectedTotalSeconds / (skill.targetHours * 3600)) * 100 : 0,
+    skill.targetHours > 0
+      ? (projectedTotalSeconds / (skill.targetHours * 3600)) * 100
+      : 0,
     100,
   );
 
@@ -91,121 +124,351 @@ export function FocusTimer() {
     resumeTimer();
   };
 
-  const handleComplete = () => {
+  const handleCompleteClick = () => {
     soundEngine.playChime();
+    setShowReflectionModal(true);
+  };
+
+  const handleCommitReflection = (reflection: SessionReflection) => {
+    setShowReflectionModal(false);
+    completeTimer(reflection);
+  };
+
+  const handleSkipReflection = () => {
+    setShowReflectionModal(false);
     completeTimer();
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-canvas flex flex-col items-center justify-center p-6 animate-fade-in">
-      {/* Cancel button (top-right) */}
-      <button
-        type="button"
-        onClick={() => setShowCancelConfirm(true)}
-        className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full text-zinc-600 hover:text-zinc-400 hover:bg-elevated transition-colors duration-150 cursor-pointer"
-        aria-label="Cancel session"
-      >
-        <X size={20} />
-      </button>
+  const handleSaveEditedIntention = () => {
+    updateTimerIntention(editedIntention);
+    setIsEditingIntention(false);
+  };
 
-      {/* Skill info */}
-      <div className="text-center mb-8">
-        <span className="text-3xl mb-2 block">{skill.icon}</span>
-        <h1 className="text-lg font-semibold text-zinc-100">{skill.name}</h1>
-        <p className="text-xs text-zinc-500 mt-1">
-          {formatHoursMinutes(currentTotalSeconds)} invested
-        </p>
+  // Ring circumference calculation (radius = 110)
+  const radius = 110;
+  const circumference = 2 * Math.PI * radius;
+
+  // Progress calculations:
+  // If target duration is set, progress fills to 100% of target.
+  // If open flow, progress loops gracefully every hour (3600s).
+  let ringProgress = (elapsed % 3600) / 3600;
+  if (targetDuration && targetDuration > 0) {
+    ringProgress = Math.min(1.0, elapsed / targetDuration);
+  }
+  const strokeDashoffset = circumference - ringProgress * circumference;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-[#060813] select-none flex flex-col items-center justify-between p-6 sm:p-8 overflow-hidden animate-fade-in">
+      {/* ── 1. Serene Cosmic Atmosphere ─────────────────────────── */}
+      <div className="absolute inset-0 pointer-events-none -z-10 overflow-hidden">
+        {/* Skill-colored central ambient breathing nebula */}
+        <div
+          style={{
+            background: `radial-gradient(circle at 50% 45%, ${skill.color}18 0%, transparent 60%), radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.08) 0%, transparent 75%)`,
+          }}
+          className={cn(
+            'absolute inset-0 transition-opacity duration-1000',
+            isRunning ? 'opacity-100 animate-pulse-glow' : 'opacity-60',
+          )}
+        />
+
+        {/* Sparse ambient cosmic embers */}
+        <div className="absolute top-1/4 left-1/5 w-1 h-1 rounded-full bg-white/40 blur-[0.5px] animate-ping opacity-30" />
+        <div className="absolute top-3/5 right-1/4 w-1.5 h-1.5 rounded-full bg-white/30 blur-[1px] opacity-40" />
+        <div className="absolute bottom-1/4 left-1/3 w-1 h-1 rounded-full bg-cyan-300/30 blur-[0.5px] opacity-30" />
       </div>
 
-      {/* Timer Ring */}
-      <div
-        className={cn(
-          'mb-10 transition-shadow duration-1000',
-          isRunning && 'animate-pulse-glow rounded-full',
-        )}
-      >
-        <ProgressRing
-          percentage={projectedPercentage}
-          size={220}
-          strokeWidth={5}
-          color={skill.color}
+      {/* ── 2. Top Header (Skill Context & Exit) ────────────────── */}
+      <header className="w-full max-w-md flex items-center justify-between pt-2">
+        <div className="flex items-center gap-3">
+          <div
+            className="w-10 h-10 rounded-2xl flex items-center justify-center text-xl border shadow-lg"
+            style={{
+              backgroundColor: `${skill.color}20`,
+              borderColor: `${skill.color}45`,
+              boxShadow: `0 0 16px ${skill.color}30`,
+            }}
+          >
+            {skill.icon}
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <h1 className="text-sm font-bold text-white uppercase tracking-wider">
+                {skill.name}
+              </h1>
+              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+            </div>
+            <p className="text-[11px] text-zinc-400 font-medium">
+              Deliberate Practice Chamber
+            </p>
+          </div>
+        </div>
+
+        {/* Subtle Discard Button */}
+        <button
+          type="button"
+          onClick={() => setShowCancelConfirm(true)}
+          className="w-9 h-9 flex items-center justify-center rounded-xl text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.06] border border-transparent hover:border-white/[0.08] transition-all cursor-pointer"
+          aria-label="Discard session"
+          title="Discard Session"
         >
-          <div className="text-center">
-            <p
+          <X size={18} />
+        </button>
+      </header>
+
+      {/* ── 3. Central Focus Chamber (Temporal Energy Ring) ────── */}
+      <main className="flex flex-col items-center justify-center my-auto space-y-5">
+        {/* Holographic Deliberate Intention Pill */}
+        <div className="max-w-xs sm:max-w-md text-center">
+          {isEditingIntention ? (
+            <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-black/60 border border-accent/50 shadow-lg">
+              <input
+                ref={editInputRef}
+                type="text"
+                value={editedIntention}
+                onChange={(e) => setEditedIntention(e.target.value)}
+                placeholder="Edit practice target..."
+                maxLength={100}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSaveEditedIntention();
+                  else if (e.key === 'Escape') setIsEditingIntention(false);
+                }}
+                className="px-3 py-1 bg-transparent text-xs text-zinc-100 placeholder:text-zinc-500 focus:outline-none flex-1"
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={handleSaveEditedIntention}
+                className="px-2.5 py-1 rounded-xl bg-accent text-white text-[10px] font-bold cursor-pointer"
+              >
+                Save
+              </button>
+            </div>
+          ) : activeTimer.intention ? (
+            <div
+              onClick={() => setIsEditingIntention(true)}
+              className="group inline-flex items-center gap-2 px-3.5 py-1.5 rounded-2xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 hover:border-white/20 transition-all cursor-pointer shadow-lg backdrop-blur-xl"
+              title="Click to edit intention"
+            >
+              <Target size={13} className="text-accent flex-shrink-0" />
+              <span className="text-xs font-semibold text-zinc-200 truncate max-w-[220px] sm:max-w-[320px]">
+                {activeTimer.intention}
+              </span>
+              <Edit2
+                size={11}
+                className="text-zinc-500 group-hover:text-zinc-300 opacity-0 group-hover:opacity-100 transition-opacity"
+              />
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setIsEditingIntention(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/[0.02] hover:bg-white/[0.06] border border-dashed border-white/15 text-[11px] font-medium text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+            >
+              <Target size={12} className="text-zinc-500" />
+              <span>+ Add deliberate target</span>
+            </button>
+          )}
+        </div>
+
+        {/* Temporal Ring Viewport */}
+        <div className="relative flex items-center justify-center">
+          {/* Outer Faint Ambient Orbit Ring */}
+          <div
+            className={cn(
+              'absolute w-[276px] h-[276px] rounded-full border border-dashed transition-all duration-1000',
+              isRunning
+                ? 'border-white/[0.12] animate-spin-slow'
+                : 'border-white/[0.06]',
+            )}
+            style={{ animationDuration: '60s' }}
+          />
+
+          {/* SVG Progress Ring */}
+          <svg
+            className="w-[260px] h-[260px] -rotate-90 transform"
+            viewBox="0 0 240 240"
+          >
+            {/* Background Track Ring */}
+            <circle
+              cx="120"
+              cy="120"
+              r={radius}
+              stroke="rgba(255, 255, 255, 0.05)"
+              strokeWidth="4"
+              fill="transparent"
+            />
+            {/* Dynamic Energy Arc */}
+            <circle
+              cx="120"
+              cy="120"
+              r={radius}
+              stroke={skill.color}
+              strokeWidth="5"
+              strokeDasharray={circumference}
+              strokeDashoffset={strokeDashoffset}
+              strokeLinecap="round"
+              fill="transparent"
+              style={{
+                filter: `drop-shadow(0 0 10px ${skill.color}80)`,
+                transition: 'stroke-dashoffset 0.35s ease-out',
+              }}
+            />
+          </svg>
+
+          {/* Centered Monospace Time Display */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center select-none">
+            <span
               className={cn(
-                'font-bold tabular-nums tracking-tight',
-                elapsed >= 3600 ? 'text-3xl' : 'text-4xl',
+                'font-extrabold tabular-nums tracking-tighter text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.2)]',
+                elapsed >= 3600
+                  ? 'text-4xl sm:text-5xl'
+                  : 'text-5xl sm:text-6xl',
               )}
             >
               {formatTimerDisplay(elapsed)}
-            </p>
-            {isPaused ? (
-              <p className="text-xs text-warning mt-1 animate-pulse">
-                Paused
-              </p>
-            ) : null}
+            </span>
+
+            {/* State Indicator & Target Duration */}
+            <div className="mt-2 flex items-center gap-1.5">
+              {isPaused ? (
+                <span className="text-[10px] font-bold uppercase tracking-widest text-amber-400 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-full animate-pulse">
+                  Paused
+                </span>
+              ) : targetDuration ? (
+                <span className="text-[10px] font-bold uppercase tracking-widest text-cyan-300 bg-cyan-500/10 border border-cyan-500/25 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                  <Clock size={10} className="animate-spin-slow" />
+                  <span>
+                    {Math.round(ringProgress * 100)}% of {Math.round(targetDuration / 60)}m
+                  </span>
+                </span>
+              ) : (
+                <span className="text-[10px] font-bold uppercase tracking-widest text-accent/90 bg-accent/10 border border-accent/25 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent animate-ping" />
+                  <span>Deep Flow</span>
+                </span>
+              )}
+            </div>
           </div>
-        </ProgressRing>
-      </div>
+        </div>
 
-      {/* Controls */}
-      <div className="flex items-center gap-4">
-        {/* Pause / Resume */}
-        <button
-          type="button"
-          onClick={isRunning ? pauseTimer : handleResume}
-          className={cn(
-            'w-16 h-16 rounded-full flex items-center justify-center',
-            'transition-all duration-200 cursor-pointer',
-            isRunning
-              ? 'bg-elevated hover:bg-zinc-700 text-zinc-200'
-              : 'bg-accent hover:bg-indigo-500 text-white',
-          )}
-          aria-label={isRunning ? 'Pause' : 'Resume'}
-        >
-          {isRunning ? <Pause size={24} /> : <Play size={24} className="ml-1" />}
-        </button>
+        {/* ── 4. Dual Metric Progress Pill ──────────────────────── */}
+        <div className="flex items-center gap-4 px-4 py-2 rounded-2xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-xl shadow-inner text-center">
+          <div className="space-y-0.5 pr-4 border-r border-white/[0.08]">
+            <span className="text-[9px] uppercase font-bold tracking-wider text-zinc-400 block">
+              Invested Before
+            </span>
+            <span className="text-xs font-bold text-zinc-200 tabular-nums">
+              {formatHoursMinutes(currentTotalSeconds)}
+            </span>
+          </div>
+          <div className="space-y-0.5 pl-1">
+            <span className="text-[9px] uppercase font-bold tracking-wider text-accent block">
+              Target Milestone
+            </span>
+            <span className="text-xs font-bold text-zinc-200 tabular-nums">
+              {skill.targetHours > 0
+                ? `${projectedPercentage.toFixed(0)}% reached`
+                : 'Continuous'}
+            </span>
+          </div>
+        </div>
+      </main>
 
-        {/* Complete */}
-        <Button
-          variant={canComplete ? 'primary' : 'secondary'}
-          size="lg"
-          onClick={handleComplete}
-          disabled={!canComplete}
-          className="gap-2"
-        >
-          <Square size={16} />
-          Complete
-        </Button>
-      </div>
+      {/* ── 5. Bottom Actions & Restrained Mantra ──────────────── */}
+      <footer className="w-full max-w-sm flex flex-col items-center space-y-4 pb-2">
+        {/* Controls */}
+        <div className="w-full flex items-center gap-3">
+          {/* Pause / Resume Button (Secondary) */}
+          <button
+            type="button"
+            onClick={isRunning ? pauseTimer : handleResume}
+            className={cn(
+              'h-12 px-4 rounded-2xl flex items-center justify-center gap-2 font-bold text-xs',
+              'border transition-all duration-200 cursor-pointer flex-shrink-0',
+              isRunning
+                ? 'bg-white/[0.06] hover:bg-white/[0.12] border-white/[0.14] text-zinc-300'
+                : 'bg-accent/20 hover:bg-accent/30 border-accent/40 text-accent shadow-[0_0_15px_rgba(129,140,248,0.25)]',
+            )}
+            aria-label={isRunning ? 'Pause Focus' : 'Resume Focus'}
+          >
+            {isRunning ? (
+              <>
+                <Pause size={16} />
+                <span>Pause</span>
+              </>
+            ) : (
+              <>
+                <Play size={16} className="fill-current" />
+                <span>Resume</span>
+              </>
+            )}
+          </button>
 
-      {/* Cancel Confirmation */}
-      {showCancelConfirm ? (
+          {/* Complete Focus Button (Primary) */}
+          <Button
+            variant="primary"
+            size="lg"
+            onClick={handleCompleteClick}
+            disabled={!canComplete}
+            className={cn(
+              'flex-1 h-12 rounded-2xl font-bold gap-2 text-xs shadow-[0_0_24px_rgba(129,140,248,0.4)]',
+              'hover:shadow-[0_0_32px_rgba(129,140,248,0.6)] cursor-pointer transition-all',
+              !canComplete && 'opacity-50 cursor-not-allowed shadow-none',
+            )}
+          >
+            <CheckCircle2 size={16} className="text-white" />
+            <span>Complete Focus</span>
+          </Button>
+        </div>
+
+        {/* Restrained Focus Mantra */}
+        <p className="text-[11px] text-zinc-500 font-medium tracking-wide flex items-center gap-1.5">
+          <Sparkles size={11} className="text-zinc-600" />
+          <span>Stay with the work. Every focused minute leaves a trace.</span>
+        </p>
+      </footer>
+
+      {/* ── 6. Reflection Modal on Completion ──────────────────── */}
+      <SessionReflectionModal
+        open={showReflectionModal}
+        skill={skill}
+        durationSeconds={elapsed}
+        initialIntention={activeTimer.intention}
+        onComplete={handleCommitReflection}
+        onSkip={handleSkipReflection}
+      />
+
+      {/* ── 7. Discard Session Confirmation Dialog ─────────────── */}
+      {showCancelConfirm && (
         <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
           <div
-            className="absolute inset-0 bg-black/60"
+            className="absolute inset-0 bg-black/75 backdrop-blur-sm animate-fade-in"
             onClick={() => setShowCancelConfirm(false)}
           />
-          <div className="relative z-10 bg-surface border border-edge rounded-card p-6 max-w-xs w-full text-center animate-scale-in">
-            <h3 className="text-base font-semibold text-zinc-100 mb-2">
-              Discard this session?
-            </h3>
-            <p className="text-sm text-zinc-400 mb-5">
-              {formatTimerDisplay(elapsed)} of practice will not be saved.
-            </p>
-            <div className="flex gap-3">
+          <div className="relative z-10 bg-[#0b0f1e] border border-white/[0.12] rounded-3xl p-6 max-w-xs w-full text-center shadow-2xl backdrop-blur-2xl animate-scale-in space-y-4">
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-white">
+                Discard this session?
+              </h3>
+              <p className="text-xs text-zinc-400">
+                {formatTimerDisplay(elapsed)} of deliberate practice will not be
+                saved to your Cosmos.
+              </p>
+            </div>
+            <div className="flex gap-2 pt-1">
               <Button
                 variant="secondary"
-                size="md"
-                className="flex-1"
+                size="sm"
+                className="flex-1 font-semibold text-xs h-9 cursor-pointer"
                 onClick={() => setShowCancelConfirm(false)}
               >
                 Keep going
               </Button>
               <Button
                 variant="danger"
-                size="md"
-                className="flex-1"
+                size="sm"
+                className="flex-1 font-semibold text-xs h-9 cursor-pointer"
                 onClick={cancelTimer}
               >
                 Discard
@@ -213,7 +476,7 @@ export function FocusTimer() {
             </div>
           </div>
         </div>
-      ) : null}
+      )}
     </div>
   );
 }

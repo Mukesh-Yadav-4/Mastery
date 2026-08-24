@@ -29,6 +29,12 @@ export interface Skill {
   updatedAt: string;
 }
 
+export interface SessionReflection {
+  qualityRating?: number; // 1 to 5 stars (Flow / Focus depth)
+  friction?: string; // what was hard / what to focus on next
+  notes?: string; // key insight / takeaways
+}
+
 export interface FocusSession {
   id: string;
   userId: string;
@@ -37,6 +43,9 @@ export interface FocusSession {
   endedAt: string; // ISO timestamp
   durationSeconds: number;
   status: 'completed' | 'cancelled';
+  intention?: string; // Deliberate micro-goal / target
+  targetDurationSeconds?: number | null; // Configured target or null for open flow
+  reflection?: SessionReflection;
   createdAt: string;
 }
 
@@ -87,6 +96,8 @@ export interface TimerState {
   pausedAt: number | null; // Unix ms when paused, null if running
   totalPausedMs: number; // Accumulated pause duration in ms
   status: 'running' | 'paused';
+  intention?: string; // Deliberate practice intention
+  targetDurationSeconds?: number | null; // Target focus duration in seconds
 }
 
 // ── UI State ──────────────────────────────────────────────────

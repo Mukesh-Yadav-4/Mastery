@@ -12,6 +12,8 @@
  *   scaled dynamically to the user's chosen target hours.
  */
 
+import { getEvolvedSkillPalette, type EvolvedSkillPalette } from './palettes';
+
 export interface ProgressionStage {
   id: string;
   name: string;
@@ -42,13 +44,14 @@ export interface SkillProgressionState {
   currentStage: ProgressionStage;
   stageProgressRatio: number; // 0 to 1 within the current stage
   boundedVisualScale: number; // Strictly bounded [0.70, 1.48]
-  levelAuraIntensity: number; // [1.0, 3.6]
-  haloOpacity: number; // [0.18, 0.65]
+  levelAuraIntensity: number; // Bounded [1.0, 1.45]
+  haloOpacity: number; // Bounded [0.20, 0.38]
   structureTier: number; // 1 to 6
   nextVisualMilestoneHours: number | null;
   hoursToNextMilestone: number | null;
   activeCheckpointsCrossed: number[];
   calibrationNote: string;
+  evolvedPalette?: EvolvedSkillPalette;
 }
 
 // ── Checkpoints ──────────────────────────────────────────────────
@@ -611,6 +614,7 @@ function calculateBoundedScale(hours: number, stage: ProgressionStage): number {
 
 /**
  * Calculate Level -> Aura properties (Level controls aura/radiance, NOT physical bulk)
+ * Strictly bounded to prevent nodes from becoming blinding white suns.
  */
 export function calculateLevelAura(level: number): {
   auraIntensity: number;
@@ -619,14 +623,14 @@ export function calculateLevelAura(level: number): {
 } {
   const safeLevel = Math.max(1, level);
 
-  // Aura intensity: 1.2 for Level 1, up to 3.4 for Level 20+
-  const auraIntensity = Math.min(3.6, 1.2 + Math.log2(safeLevel) * 0.55);
+  // Aura intensity: Bounded strictly to [1.0, 1.45]
+  const auraIntensity = Math.min(1.45, 1.0 + Math.log2(safeLevel) * 0.10);
 
-  // Halo opacity: 0.18 for Level 1, up to 0.65 for Level 20+
-  const haloOpacity = Math.min(0.65, 0.18 + (safeLevel - 1) * 0.025);
+  // Halo opacity: Bounded strictly to [0.20, 0.38]
+  const haloOpacity = Math.min(0.38, 0.20 + (safeLevel - 1) * 0.008);
 
-  // Emissive intensity: 1.5 for Level 1, up to 3.5 for Level 20+
-  const emissiveIntensity = Math.min(3.5, 1.5 + (safeLevel - 1) * 0.11);
+  // Emissive intensity: Bounded strictly to [0.85, 1.35]
+  const emissiveIntensity = Math.min(1.35, 0.85 + (safeLevel - 1) * 0.025);
 
   return {
     auraIntensity,
@@ -645,6 +649,7 @@ export function getSkillProgressionState(
   level: number,
   category?: string,
   targetHours: number = 100,
+  baseColor?: string,
 ): SkillProgressionState {
   const totalHours = totalSeconds / 3600;
   const profile = getProgressionProfile(skillName, category, targetHours);
@@ -668,7 +673,7 @@ export function getSkillProgressionState(
   // 3. Bounded visual scale
   const boundedVisualScale = calculateBoundedScale(totalHours, currentStage);
 
-  // 4. Level Aura properties
+  // 4. Level Aura properties (Strictly bounded)
   const { auraIntensity, haloOpacity } = calculateLevelAura(level);
 
   // 5. Next visual checkpoint milestone
@@ -678,6 +683,13 @@ export function getSkillProgressionState(
 
   const hoursToNextMilestone =
     nextCheckpoint !== null ? Math.max(0, nextCheckpoint - totalHours) : null;
+
+  // 6. Evolved Skill Palette (Stage-informed chromatic depth and harmonies)
+  const evolvedPalette = getEvolvedSkillPalette(
+    baseColor || '#818cf8',
+    totalHours,
+    currentStage.structureTier,
+  );
 
   return {
     skillId,
@@ -694,5 +706,6 @@ export function getSkillProgressionState(
     hoursToNextMilestone,
     activeCheckpointsCrossed: crossedCheckpoints,
     calibrationNote: profile.sourceNote,
+    evolvedPalette,
   };
 }

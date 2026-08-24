@@ -63,10 +63,15 @@ interface AppContextValue {
 
   // Timer
   activeTimer: TimerState | null;
-  startTimer: (skillId: string) => void;
+  startTimer: (
+    skillId: string,
+    intention?: string,
+    targetDurationSeconds?: number | null,
+  ) => void;
+  updateTimerIntention: (intention: string) => void;
   pauseTimer: () => void;
   resumeTimer: () => void;
-  completeTimer: () => void;
+  completeTimer: (reflection?: FocusSession['reflection']) => void;
   cancelTimer: () => void;
 
   // Skills
@@ -82,6 +87,11 @@ interface AppContextValue {
   dismissSessionReward: () => void;
   activeFeedbackEvent: CosmicFeedbackEvent | null;
   dismissFeedback: () => void;
+
+  // Development Tooling
+  triggerDevPreview?: (event: CosmicFeedbackEvent) => void;
+  triggerDevSimulate?: (durationSeconds: number, skillId?: string) => void;
+  isDevPreview?: boolean;
 
   // Refresh
   refreshData: () => void;
@@ -192,13 +202,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // ── Timer Actions ─────────────────────────────────────────
 
   const startTimer = useCallback(
-    (skillId: string) => {
+    (
+      skillId: string,
+      intention?: string,
+      targetDurationSeconds?: number | null,
+    ) => {
       const timer: TimerState = {
         skillId,
         startedAt: Date.now(),
         pausedAt: null,
         totalPausedMs: 0,
         status: 'running',
+        intention: intention?.trim() || undefined,
+        targetDurationSeconds: targetDurationSeconds ?? undefined,
       };
       setActiveTimer(timer);
       db.saveTimerState(timer);
@@ -206,6 +222,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     },
     [setActiveView],
   );
+
+  const updateTimerIntention = useCallback((intention: string) => {
+    setActiveTimer((prev) => {
+      if (!prev) return prev;
+      const updated: TimerState = {
+        ...prev,
+        intention: intention.trim() || undefined,
+      };
+      db.saveTimerState(updated);
+      return updated;
+    });
+  }, []);
 
   const pauseTimer = useCallback(() => {
     setActiveTimer((prev) => {
@@ -234,59 +262,64 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const completeTimer = useCallback(() => {
-    if (!user || !activeTimer) return;
+  const completeTimer = useCallback(
+    (reflection?: FocusSession['reflection']) => {
+      if (!user || !activeTimer) return;
 
-    const now = Date.now();
-    let effectivePausedMs = activeTimer.totalPausedMs;
+      const now = Date.now();
+      let effectivePausedMs = activeTimer.totalPausedMs;
 
-    // If currently paused, count time since pause
-    if (activeTimer.status === 'paused' && activeTimer.pausedAt) {
-      effectivePausedMs += now - activeTimer.pausedAt;
-    }
+      // If currently paused, count time since pause
+      if (activeTimer.status === 'paused' && activeTimer.pausedAt) {
+        effectivePausedMs += now - activeTimer.pausedAt;
+      }
 
-    const durationMs = now - activeTimer.startedAt - effectivePausedMs;
-    const durationSeconds = Math.max(0, Math.round(durationMs / 1000));
+      const durationMs = now - activeTimer.startedAt - effectivePausedMs;
+      const durationSeconds = Math.max(0, Math.round(durationMs / 1000));
 
-    // Discard sessions shorter than minimum
-    if (durationSeconds < MIN_SESSION_DURATION_SECONDS) {
-      setActiveTimer(null);
-      db.saveTimerState(null);
-      setActiveView('dashboard');
-      return;
-    }
+      // Discard sessions shorter than minimum
+      if (durationSeconds < MIN_SESSION_DURATION_SECONDS) {
+        setActiveTimer(null);
+        db.saveTimerState(null);
+        setActiveView('dashboard');
+        return;
+      }
 
-    // Capture pre-completion progression states
-    const preSessions = db.getSessions(user.id);
-    const preGlobalXP = getGlobalTotalXP(preSessions);
-    const preGlobalLevel = calculateLevelInfo(preGlobalXP);
-    const preSkillXP = getSkillTotalXP(activeTimer.skillId, preSessions);
-    const preSkillLevel = calculateLevelInfo(preSkillXP);
-    const preSkillSeconds = preSessions
-      .filter((s) => s.skillId === activeTimer.skillId)
-      .reduce((acc, s) => acc + s.durationSeconds, 0);
-    const preSkillHours = secondsToHours(preSkillSeconds);
+      // Capture pre-completion progression states
+      const preSessions = db.getSessions(user.id);
+      const preGlobalXP = getGlobalTotalXP(preSessions);
+      const preGlobalLevel = calculateLevelInfo(preGlobalXP);
+      const preSkillXP = getSkillTotalXP(activeTimer.skillId, preSessions);
+      const preSkillLevel = calculateLevelInfo(preSkillXP);
+      const preSkillSeconds = preSessions
+        .filter((s) => s.skillId === activeTimer.skillId)
+        .reduce((acc, s) => acc + s.durationSeconds, 0);
+      const preSkillHours = secondsToHours(preSkillSeconds);
 
-    const skill = skills.find((s) => s.id === activeTimer.skillId);
-    const preProgression = skill
-      ? getSkillProgressionState(
-          skill.id,
-          skill.name,
-          preSkillSeconds,
-          preSkillLevel.level,
-          skill.category,
-          skill.targetHours,
-        )
-      : null;
+      const skill = skills.find((s) => s.id === activeTimer.skillId);
+      const preProgression = skill
+        ? getSkillProgressionState(
+            skill.id,
+            skill.name,
+            preSkillSeconds,
+            preSkillLevel.level,
+            skill.category,
+            skill.targetHours,
+            skill.color,
+          )
+        : null;
 
-    // Save session
-    db.createSession(
-      user.id,
-      activeTimer.skillId,
-      activeTimer.startedAt,
-      now,
-      durationSeconds,
-    );
+      // Save session with deliberate intention and reflection
+      db.createSession(
+        user.id,
+        activeTimer.skillId,
+        activeTimer.startedAt,
+        now,
+        durationSeconds,
+        activeTimer.intention,
+        activeTimer.targetDurationSeconds,
+        reflection,
+      );
 
     // Capture post-completion progression states
     const updatedSessions = db.getSessions(user.id);
@@ -471,6 +504,128 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setSessionReward(null);
   }, []);
 
+  // ── Development Tooling ───────────────────────────────────
+
+  const triggerDevPreview = useCallback((event: CosmicFeedbackEvent) => {
+    setActiveFeedbackEvent(event);
+    setActiveView('dashboard');
+  }, []);
+
+  const triggerDevSimulate = useCallback(
+    (durationSeconds: number, targetSkillId?: string) => {
+      if (!user) return;
+      const skill = targetSkillId
+        ? skills.find((s) => s.id === targetSkillId)
+        : skills[0];
+      if (!skill) return;
+
+      const now = Date.now();
+      const startedAt = now - durationSeconds * 1000;
+
+      // Capture pre-completion states
+      const preSessions = db.getSessions(user.id);
+      const preGlobalXP = getGlobalTotalXP(preSessions);
+      const preGlobalLevel = calculateLevelInfo(preGlobalXP);
+      const preSkillXP = getSkillTotalXP(skill.id, preSessions);
+      const preSkillLevel = calculateLevelInfo(preSkillXP);
+      const preSkillSeconds = preSessions
+        .filter((s) => s.skillId === skill.id)
+        .reduce((acc, s) => acc + s.durationSeconds, 0);
+      const preSkillHours = secondsToHours(preSkillSeconds);
+
+      const preProgression = getSkillProgressionState(
+        skill.id,
+        skill.name,
+        preSkillSeconds,
+        preSkillLevel.level,
+        skill.category,
+        skill.targetHours,
+      );
+
+      // Save session to actual database
+      db.createSession(user.id, skill.id, startedAt, now, durationSeconds);
+
+      // Capture post-completion states
+      const updatedSessions = db.getSessions(user.id);
+      const postGlobalXP = getGlobalTotalXP(updatedSessions);
+      const postGlobalLevel = calculateLevelInfo(postGlobalXP);
+      const postSkillXP = getSkillTotalXP(skill.id, updatedSessions);
+      const postSkillLevel = calculateLevelInfo(postSkillXP);
+      const postSkillSeconds = updatedSessions
+        .filter((s) => s.skillId === skill.id)
+        .reduce((acc, s) => acc + s.durationSeconds, 0);
+      const postSkillHours = secondsToHours(postSkillSeconds);
+
+      const postProgression = getSkillProgressionState(
+        skill.id,
+        skill.name,
+        postSkillSeconds,
+        postSkillLevel.level,
+        skill.category,
+        skill.targetHours,
+      );
+
+      const xpBreakdown = getSessionXPBreakdown(durationSeconds, 'completed');
+
+      const crossedHorizon =
+        postProgression.structureTier > preProgression.structureTier ||
+        postProgression.activeCheckpointsCrossed.length >
+          preProgression.activeCheckpointsCrossed.length;
+
+      const crossedStage =
+        postProgression.currentStage.id !== preProgression.currentStage.id;
+
+      let significance: 'short' | 'normal' | 'long' | 'horizon' = 'normal';
+      if (crossedHorizon || crossedStage) {
+        significance = 'horizon';
+      } else if (durationSeconds >= 45 * 60) {
+        significance = 'long';
+      } else if (durationSeconds >= 15 * 60) {
+        significance = 'normal';
+      } else {
+        significance = 'short';
+      }
+
+      const feedbackEvent: CosmicFeedbackEvent = {
+        id: crypto.randomUUID(),
+        skillId: skill.id,
+        skillName: skill.name,
+        skillIcon: skill.icon,
+        skillColor: skill.color,
+        durationSeconds,
+        xpEarned: xpBreakdown.totalXP,
+        baseXP: xpBreakdown.baseXP,
+        bonusXP: xpBreakdown.bonusXP,
+        previousSeconds: preSkillSeconds,
+        newSeconds: postSkillSeconds,
+        previousHours: preSkillHours,
+        newHours: postSkillHours,
+        previousGlobalLevel: preGlobalLevel,
+        newGlobalLevel: postGlobalLevel,
+        previousSkillLevel: preSkillLevel,
+        newSkillLevel: postSkillLevel,
+        didLevelUp: postGlobalLevel.level > preGlobalLevel.level,
+        didSkillLevelUp: postSkillLevel.level > preSkillLevel.level,
+        crossedHorizon,
+        newHorizonHours: postProgression.nextVisualMilestoneHours,
+        crossedStage,
+        previousStageName: preProgression.currentStage.name,
+        newStageName: postProgression.currentStage.name,
+        stageTransitionTriggered: crossedStage,
+        significance,
+      };
+
+      setActiveFeedbackEvent(feedbackEvent);
+      setSessions(updatedSessions);
+      setActiveView('dashboard');
+    },
+    [user, skills],
+  );
+
+  const isDevPreview = Boolean(
+    activeFeedbackEvent?.id.startsWith('dev-preview-'),
+  );
+
   // ── Refresh ───────────────────────────────────────────────
 
   const refreshData = useCallback(() => {
@@ -497,6 +652,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setActiveView,
         activeTimer,
         startTimer,
+        updateTimerIntention,
         pauseTimer,
         resumeTimer,
         completeTimer,
@@ -511,6 +667,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         dismissSessionReward,
         activeFeedbackEvent,
         dismissFeedback,
+        triggerDevPreview,
+        triggerDevSimulate,
+        isDevPreview,
         refreshData,
       }}
     >

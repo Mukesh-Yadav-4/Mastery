@@ -22,7 +22,7 @@ export function CosmicFeedbackOverlay({
   });
   const animFrameRef = useRef<number | null>(null);
 
-  // Keyboard Escape listener
+  // Keyboard Escape / Enter listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' || e.key === 'Enter') {
@@ -66,48 +66,63 @@ export function CosmicFeedbackOverlay({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 select-none pointer-events-none"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 sm:p-4 select-none pointer-events-none"
       role="dialog"
       aria-modal="true"
       aria-label="Cosmic Practice Complete"
     >
-      {/* Subtle non-blocking ambient vignette backdrop */}
+      {/* Invisible click-outside dismiss surface (preserves 100% Cosmos visual clarity) */}
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-xs pointer-events-auto animate-fade-in"
+        className="absolute inset-0 pointer-events-auto cursor-pointer"
         onClick={onDismiss}
         aria-hidden="true"
       />
 
-      {/* Holographic Floating Feedback Window */}
-      <div
+      {/* Lightweight Holographic Reward Capsule */}
+      <aside
+        onClick={(e) => e.stopPropagation()}
         style={{
-          background: `radial-gradient(ellipse at 50% 0%, ${event.skillColor}22 0%, transparent 70%), rgba(7, 10, 22, 0.85)`,
-          boxShadow: `0 24px 60px -12px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.12), 0 0 35px -5px ${event.skillColor}35, inset 0 1px 1px 0 rgba(255, 255, 255, 0.2)`,
+          background: `radial-gradient(ellipse at 50% 0%, ${event.skillColor}20 0%, transparent 65%), rgba(7, 10, 22, 0.82)`,
+          boxShadow: `0 20px 50px -10px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.12), 0 0 30px -5px ${event.skillColor}35, inset 0 1px 1px 0 rgba(255, 255, 255, 0.2)`,
         }}
         className={cn(
-          'relative z-10 w-full max-w-sm rounded-3xl p-5 sm:p-6 backdrop-blur-2xl pointer-events-auto',
-          'flex flex-col space-y-4 animate-scale-in transition-all duration-300',
+          'relative z-10 w-full max-w-[340px] sm:max-w-[360px] rounded-3xl p-4 sm:p-5 backdrop-blur-2xl pointer-events-auto',
+          'flex flex-col space-y-3 animate-scale-in transition-all duration-300',
         )}
       >
-        {/* ── 1. Skill Header ─────────────────────────────────── */}
-        <div className="text-center space-y-1">
-          <div className="flex items-center justify-center gap-2 mb-1">
+        {/* ── 1. Compact Header ───────────────────────────────── */}
+        <div className="flex items-center justify-between gap-2 pb-2 border-b border-white/[0.08]">
+          <div className="flex items-center gap-2.5 min-w-0">
             <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center text-xl border shadow-md"
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-lg border shadow-md flex-shrink-0"
               style={{
                 backgroundColor: `${event.skillColor}25`,
-                borderColor: `${event.skillColor}60`,
-                boxShadow: `0 0 16px ${event.skillColor}40`,
+                borderColor: `${event.skillColor}50`,
+                boxShadow: `0 0 14px ${event.skillColor}40`,
               }}
             >
               {event.skillIcon}
             </div>
+
+            <div className="min-w-0">
+              <h3 className="text-sm font-bold text-white uppercase tracking-tight truncate drop-shadow-sm">
+                {event.skillName}
+              </h3>
+              <div className="flex items-center gap-1 text-[11px] text-zinc-400">
+                <span className="font-semibold text-zinc-200">
+                  {formatDuration(event.durationSeconds)}
+                </span>
+                <span>invested</span>
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center justify-center gap-1.5">
-            <h3 className="text-base font-bold text-white uppercase tracking-tight truncate">
-              {event.skillName}
-            </h3>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {event.id.startsWith('dev-preview-') && (
+              <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 uppercase tracking-wider">
+                Preview
+              </span>
+            )}
             <span
               className="flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.2 rounded-full border"
               style={{
@@ -120,27 +135,20 @@ export function CosmicFeedbackOverlay({
               Lv.{event.newSkillLevel.level}
             </span>
           </div>
-
-          <p className="text-xs text-zinc-400 font-medium">
-            <span className="text-zinc-100 font-bold">
-              {formatDuration(event.durationSeconds)}
-            </span>{' '}
-            invested
-          </p>
         </div>
 
         {/* ── 2. Horizon Crossing Announcement (if triggered) ── */}
         {(event.crossedHorizon || event.crossedStage) && (
           <div
-            className="rounded-2xl border p-3 text-center space-y-1 animate-slide-up"
+            className="rounded-2xl border px-3 py-2 text-center space-y-0.5 animate-slide-up"
             style={{
-              backgroundColor: `${event.skillColor}15`,
+              backgroundColor: `${event.skillColor}18`,
               borderColor: `${event.skillColor}50`,
               boxShadow: `0 0 20px ${event.skillColor}25`,
             }}
           >
-            <div className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-amber-300">
-              <Sparkles size={13} className="animate-pulse text-amber-400" />
+            <div className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-amber-300">
+              <Sparkles size={11} className="animate-pulse text-amber-400" />
               <span>A New Horizon Has Opened</span>
             </div>
             <p className="text-xs font-bold text-white truncate">
@@ -149,62 +157,47 @@ export function CosmicFeedbackOverlay({
           </div>
         )}
 
-        {/* ── 3. Level-Up Alert (if triggered) ───────────────── */}
-        {(event.didLevelUp || event.didSkillLevelUp) && !event.crossedHorizon && (
-          <div className="rounded-2xl border border-accent/40 bg-accent/15 p-2.5 text-center space-y-0.5 animate-slide-up shadow-lg shadow-accent/15">
-            <span className="text-[10px] font-black uppercase tracking-wider text-accent flex items-center justify-center gap-1">
-              <Sparkles size={12} />
-              Level Up!
-            </span>
-            <p className="text-xs font-bold text-white">
-              {event.didLevelUp
-                ? `Mastery Level ${event.previousGlobalLevel.level} → Level ${event.newGlobalLevel.level} ⚡`
-                : `${event.skillName} Level ${event.previousSkillLevel.level} → Level ${event.newSkillLevel.level} ⚡`}
-            </p>
-          </div>
-        )}
-
-        {/* ── 4. XP & Horizon Stats Capsule ──────────────────── */}
-        <div className="rounded-2xl bg-white/[0.04] border border-white/[0.08] p-3.5 space-y-2.5 shadow-inner">
+        {/* ── 3. XP & Horizon Stats Pill ──────────────────────── */}
+        <div className="rounded-2xl bg-white/[0.04] border border-white/[0.08] px-3.5 py-2.5 space-y-1.5 shadow-inner">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-zinc-400">Mastery XP</span>
-            <span className="text-xl font-extrabold text-accent tabular-nums tracking-tight drop-shadow-[0_0_10px_rgba(129,140,248,0.5)]">
-              +{displayedXP} XP
+            <span className="text-[11px] font-medium text-zinc-400">Reward</span>
+            <span className="text-lg font-extrabold text-accent tabular-nums tracking-tight drop-shadow-[0_0_10px_rgba(129,140,248,0.5)]">
+              +{displayedXP} Mastery XP
             </span>
           </div>
 
           {/* Next Horizon Checkpoint */}
           {event.newHorizonHours ? (
-            <div className="pt-2 border-t border-white/[0.06] flex items-center justify-between text-xs text-zinc-300">
-              <div className="flex items-center gap-1.5">
-                <Compass size={13} className="text-cyan-400" />
-                <span className="font-semibold">Next Horizon</span>
+            <div className="pt-1.5 border-t border-white/[0.06] flex items-center justify-between text-[11px] text-zinc-300">
+              <div className="flex items-center gap-1">
+                <Compass size={12} className="text-cyan-400" />
+                <span className="font-medium">Next Horizon</span>
               </div>
               <span className="font-bold text-white tabular-nums">
                 {event.newHorizonHours}h
               </span>
             </div>
           ) : (
-            <div className="pt-2 border-t border-white/[0.06] flex items-center gap-1.5 text-xs text-amber-300 font-semibold">
-              <Sparkles size={13} />
+            <div className="pt-1.5 border-t border-white/[0.06] flex items-center gap-1 text-[11px] text-amber-300 font-semibold">
+              <Sparkles size={12} />
               <span>Journey Horizon Reached</span>
             </div>
           )}
         </div>
 
-        {/* ── 5. Continue CTA Button ──────────────────────────── */}
-        <div className="pt-1">
+        {/* ── 4. Continue CTA Button ──────────────────────────── */}
+        <div className="pt-0.5">
           <Button
             variant="primary"
-            size="lg"
+            size="sm"
             onClick={onDismiss}
-            className="w-full font-bold gap-2 py-2.5 text-sm shadow-[0_0_20px_rgba(129,140,248,0.4)] hover:shadow-[0_0_28px_rgba(129,140,248,0.6)] cursor-pointer"
+            className="w-full font-bold gap-1.5 py-2 text-xs shadow-[0_0_18px_rgba(129,140,248,0.4)] hover:shadow-[0_0_26px_rgba(129,140,248,0.6)] cursor-pointer h-9"
           >
             <span>Continue</span>
-            <ArrowRight size={16} />
+            <ArrowRight size={14} />
           </Button>
         </div>
-      </div>
+      </aside>
     </div>
   );
 }

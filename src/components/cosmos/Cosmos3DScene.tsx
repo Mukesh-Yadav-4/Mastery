@@ -1,14 +1,14 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import type { SkillProgressionState } from '../../utils/progression';
-import { calculateLevelAura } from '../../utils/progression';
 import { type CorePalette, getCorePalette } from '../../utils/palettes';
 import type { CosmicFeedbackEvent } from '../../types';
 import { soundEngine } from '../../utils/audio';
+import { RotateCcw } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 export interface SceneNodeData {
@@ -96,6 +96,14 @@ export function Cosmos3DScene({
   const mountRef = useRef<HTMLDivElement | null>(null);
   const labelElsRef = useRef<Map<string, HTMLDivElement>>(new Map());
 
+  const nodesRef = useRef<SceneNodeData[]>(nodes);
+  const rebuildSkillNodesRef = useRef<((currentNodes: SceneNodeData[]) => void) | null>(null);
+
+  useEffect(() => {
+    nodesRef.current = nodes;
+    rebuildSkillNodesRef.current?.(nodes);
+  }, [nodes]);
+
   // Store active selection in ref to avoid re-initializing WebGL on selection change
   const selectedNodeIdRef = useRef<string | undefined>(selectedNodeId);
   useEffect(() => {
@@ -123,14 +131,25 @@ export function Cosmos3DScene({
   const cinematicStateRef = useRef<{
     eventId: string | null;
     startTime: number;
-    phase: 'idle' | 'focus' | 'core_charge' | 'transfer' | 'absorption' | 'reveal' | 'settled';
+    phase:
+      | 'idle'
+      | 'focus'
+      | 'core_charge'
+      | 'transfer'
+      | 'absorption'
+      | 'settle'
+      | 'reveal'
+      | 'settled';
     targetSkillId: string | null;
     significance: 'short' | 'normal' | 'long' | 'horizon';
     tFocus: number;
     tCoreCharge: number;
     tTransfer: number;
     tAbsorption: number;
-    soundPlayed: boolean;
+    tSettle: number;
+    coreChargeSoundPlayed: boolean;
+    surgeSoundPlayed: boolean;
+    absorptionSoundPlayed: boolean;
     revealTriggered: boolean;
   }>({
     eventId: null,
@@ -139,10 +158,13 @@ export function Cosmos3DScene({
     targetSkillId: null,
     significance: 'normal',
     tFocus: 350,
-    tCoreCharge: 650,
-    tTransfer: 1100,
-    tAbsorption: 500,
-    soundPlayed: false,
+    tCoreCharge: 750,
+    tTransfer: 1200,
+    tAbsorption: 600,
+    tSettle: 350,
+    coreChargeSoundPlayed: false,
+    surgeSoundPlayed: false,
+    absorptionSoundPlayed: false,
     revealTriggered: false,
   });
 
@@ -164,7 +186,10 @@ export function Cosmos3DScene({
           tCoreCharge: 0,
           tTransfer: 0,
           tAbsorption: 0,
-          soundPlayed: true,
+          tSettle: 0,
+          coreChargeSoundPlayed: true,
+          surgeSoundPlayed: true,
+          absorptionSoundPlayed: true,
           revealTriggered: true,
         };
         onFeedbackPhaseChangeRef.current?.('reveal');
@@ -172,10 +197,31 @@ export function Cosmos3DScene({
       }
 
       const sig = feedbackEvent.significance;
-      const tFocus = 350;
-      const tCoreCharge = sig === 'short' ? 500 : sig === 'long' || sig === 'horizon' ? 850 : 650;
-      const tTransfer = sig === 'short' ? 900 : sig === 'long' || sig === 'horizon' ? 1400 : 1100;
-      const tAbsorption = 500;
+      let tFocus = 350;
+      let tCoreCharge = 750;
+      let tTransfer = 1200;
+      let tAbsorption = 600;
+      let tSettle = 350;
+
+      if (sig === 'short') {
+        tFocus = 300;
+        tCoreCharge = 600;
+        tTransfer = 1000;
+        tAbsorption = 500;
+        tSettle = 300;
+      } else if (sig === 'long') {
+        tFocus = 400;
+        tCoreCharge = 900;
+        tTransfer = 1400;
+        tAbsorption = 700;
+        tSettle = 400;
+      } else if (sig === 'horizon') {
+        tFocus = 400;
+        tCoreCharge = 900;
+        tTransfer = 1500;
+        tAbsorption = 800;
+        tSettle = 400;
+      }
 
       cinematicStateRef.current = {
         eventId: feedbackEvent.id,
@@ -187,14 +233,19 @@ export function Cosmos3DScene({
         tCoreCharge,
         tTransfer,
         tAbsorption,
-        soundPlayed: false,
+        tSettle,
+        coreChargeSoundPlayed: false,
+        surgeSoundPlayed: false,
+        absorptionSoundPlayed: false,
         revealTriggered: false,
       };
       onFeedbackPhaseChangeRef.current?.('focus');
     } else if (!feedbackEvent) {
       cinematicStateRef.current.eventId = null;
       cinematicStateRef.current.phase = 'idle';
-      cinematicStateRef.current.soundPlayed = false;
+      cinematicStateRef.current.coreChargeSoundPlayed = false;
+      cinematicStateRef.current.surgeSoundPlayed = false;
+      cinematicStateRef.current.absorptionSoundPlayed = false;
       cinematicStateRef.current.revealTriggered = false;
     }
   }, [feedbackEvent]);
@@ -206,11 +257,41 @@ export function Cosmos3DScene({
     paletteRef.current = activePalette;
   }, [activePalette]);
 
-  // Mouse & render loop references
+  // Mouse, 3D Orbit & render loop references
   const mousePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const targetMouseRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const hoveredNodeIdRef = useRef<string | null>(null);
   const baseCameraZRef = useRef<number>(14.5);
+
+  const orbitStateRef = useRef({
+    isDragging: false,
+    dragStartX: 0,
+    dragStartY: 0,
+    orbitAngleX: 0,
+    orbitAngleY: 0,
+    targetOrbitAngleX: 0,
+    targetOrbitAngleY: 0,
+    zoomDistance: 14.5,
+    targetZoomDistance: 14.5,
+    currentLookAt: new THREE.Vector3(0, 0, 0),
+    targetLookAt: new THREE.Vector3(0, 0, 0),
+    lastInteractionTime: 0,
+    hasMoved: false,
+  });
+
+  const [isDraggingCanvas, setIsDraggingCanvas] = useState(false);
+  const [hasCustomOrbit, setHasCustomOrbit] = useState(false);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return; // Only main left click
+    const state = orbitStateRef.current;
+    state.isDragging = true;
+    state.dragStartX = e.clientX;
+    state.dragStartY = e.clientY;
+    state.hasMoved = false;
+    state.lastInteractionTime = performance.now();
+    setIsDraggingCanvas(true);
+  }, []);
 
   const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (!mountRef.current) return;
@@ -219,6 +300,54 @@ export function Cosmos3DScene({
     const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     const y = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
     targetMouseRef.current = { x, y };
+
+    const state = orbitStateRef.current;
+    if (state.isDragging) {
+      const deltaX = e.clientX - state.dragStartX;
+      const deltaY = e.clientY - state.dragStartY;
+      if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) {
+        state.hasMoved = true;
+        setHasCustomOrbit(true);
+      }
+      state.targetOrbitAngleX += deltaX * 0.0055;
+      state.targetOrbitAngleY = Math.max(
+        -Math.PI * 0.38,
+        Math.min(Math.PI * 0.38, state.targetOrbitAngleY - deltaY * 0.0055),
+      );
+      state.dragStartX = e.clientX;
+      state.dragStartY = e.clientY;
+      state.lastInteractionTime = performance.now();
+    }
+  }, []);
+
+  const handlePointerUp = useCallback(() => {
+    orbitStateRef.current.isDragging = false;
+    setIsDraggingCanvas(false);
+  }, []);
+
+  const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    const state = orbitStateRef.current;
+    const zoomDelta = e.deltaY * 0.01;
+    state.targetZoomDistance = Math.max(
+      7.0,
+      Math.min(22.0, state.targetZoomDistance + zoomDelta),
+    );
+    state.lastInteractionTime = performance.now();
+    setHasCustomOrbit(true);
+  }, []);
+
+  const handleResetCamera = useCallback(() => {
+    const state = orbitStateRef.current;
+    state.targetOrbitAngleX = 0;
+    state.targetOrbitAngleY = 0;
+    state.orbitAngleX = 0;
+    state.orbitAngleY = 0;
+    state.targetZoomDistance = baseCameraZRef.current;
+    state.zoomDistance = baseCameraZRef.current;
+    state.targetLookAt.set(0, 0, 0);
+    state.currentLookAt.set(0, 0, 0);
+    state.lastInteractionTime = performance.now();
+    setHasCustomOrbit(false);
   }, []);
 
   useEffect(() => {
@@ -475,7 +604,7 @@ export function Cosmos3DScene({
     ring2.rotation.y = Math.PI / 4;
     coreGroup.add(ring2);
 
-    const ring3Geo = new THREE.TorusGeometry(4.2, 0.014, 24, 120);
+    const ring3Geo = new THREE.TorusGeometry(3.65, 0.013, 24, 120);
     const ring3Mat = new THREE.MeshStandardMaterial({
       color: new THREE.Color(initialPal.ring3),
       emissive: new THREE.Color(initialPal.ring3),
@@ -489,12 +618,19 @@ export function Cosmos3DScene({
     coreGroup.add(ring3);
 
     // ── 6. REAL SKILL NODES & PROGRESSION-INFORMED GEOMETRIES ────
+    const nodesContainer = new THREE.Group();
+    scene.add(nodesContainer);
+
+    const curvesContainer = new THREE.Group();
+    scene.add(curvesContainer);
+
     const nodeMeshes = new Map<string, THREE.Group>();
     const nodePointLights = new Map<string, THREE.PointLight>();
-    const curveStreams: Array<{
+    let curveStreams: Array<{
       curve: THREE.CatmullRomCurve3;
       glowTubeMesh: THREE.Mesh;
       basePos: THREE.Vector3;
+      baseLightIntensity: number;
       ampX: number;
       ampY: number;
       ampZ: number;
@@ -506,229 +642,331 @@ export function Cosmos3DScene({
       freqZ: number;
       beads: Array<{ mesh: THREE.Mesh; speed: number; offset: number }>;
       pulseMesh: THREE.Mesh;
+      surgeGroup: THREE.Group;
+      leadSurgeMesh: THREE.Mesh;
+      trailMeshes: THREE.Mesh[];
+      trailOffsets: number[];
+      surgePointLight: THREE.PointLight;
       targetNodeId: string;
     }> = [];
 
-    nodes.forEach((node, idx) => {
-      const posArray = getSpatialPosition(idx, nodes.length);
-      const basePos = new THREE.Vector3(...posArray);
-
-      const nodeGroup = new THREE.Group();
-      nodeGroup.position.copy(basePos);
-      nodeGroup.userData = { id: node.id, nodeData: node };
-      scene.add(nodeGroup);
-      nodeMeshes.set(node.id, nodeGroup);
-
-      const colorVal = new THREE.Color(node.color);
-
-      // Extract progression metrics
-      const progression = node.progression;
-      const visualScale = progression ? progression.boundedVisualScale : 1.0;
-      const tier = progression ? progression.structureTier : 1;
-      const { emissiveIntensity, haloOpacity } = calculateLevelAura(node.level);
-
-      // ── A. Base Inner Glowing Energy Core (Scaled by Bounded Hours) ──
-      const innerCoreRadius = 0.48 * visualScale;
-      const nodeInnerGeo = new THREE.SphereGeometry(innerCoreRadius, 32, 32);
-      const nodeInnerMat = new THREE.MeshStandardMaterial({
-        color: colorVal,
-        emissive: colorVal,
-        emissiveIntensity: emissiveIntensity,
-        metalness: 0.8,
-        roughness: 0.12,
+    const rebuildSkillNodes = (currentNodes: SceneNodeData[]) => {
+      // 1. Dispose previous node & curve geometries and materials
+      nodesContainer.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          child.geometry?.dispose();
+          if (Array.isArray(child.material)) {
+            child.material.forEach((m) => m.dispose());
+          } else {
+            child.material?.dispose();
+          }
+        }
       });
-      const nodeInnerMesh = new THREE.Mesh(nodeInnerGeo, nodeInnerMat);
-      nodeGroup.add(nodeInnerMesh);
-
-      // ── B. Outer Halo Sphere (Richness controlled by Level) ───────
-      const haloRadius = 0.68 * visualScale;
-      const haloGeo = new THREE.SphereGeometry(haloRadius, 24, 24);
-      const haloMat = new THREE.MeshBasicMaterial({
-        color: colorVal,
-        transparent: true,
-        opacity: haloOpacity,
+      curvesContainer.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          child.geometry?.dispose();
+          if (Array.isArray(child.material)) {
+            child.material.forEach((m) => m.dispose());
+          } else {
+            child.material?.dispose();
+          }
+        }
       });
-      const haloMesh = new THREE.Mesh(haloGeo, haloMat);
-      nodeGroup.add(haloMesh);
 
-      // ── C. Structural Evolution Tiers (Milestones -> Structure) ───
-      if (tier >= 2) {
-        // Tier 2+: Physical Crystal Shell (Translucent Refraction)
-        const shellRadius = 0.72 * visualScale;
-        const nodeShellGeo = new THREE.SphereGeometry(shellRadius, 48, 48);
-        const nodeShellMat = new THREE.MeshPhysicalMaterial({
-          color: colorVal,
+      nodesContainer.clear();
+      curvesContainer.clear();
+      nodeMeshes.clear();
+      nodePointLights.clear();
+      curveStreams = [];
+
+      currentNodes.forEach((node, idx) => {
+        const posArray = getSpatialPosition(idx, currentNodes.length);
+        const basePos = new THREE.Vector3(...posArray);
+
+        const nodeGroup = new THREE.Group();
+        nodeGroup.position.copy(basePos);
+        nodeGroup.userData = { id: node.id, nodeData: node };
+        nodesContainer.add(nodeGroup);
+        nodeMeshes.set(node.id, nodeGroup);
+
+        const progression = node.progression;
+        const palette = progression?.evolvedPalette;
+        const coreColor = new THREE.Color(
+          palette?.coreColor || node.color || '#818cf8',
+        );
+        const emissiveColor = new THREE.Color(
+          palette?.emissiveColor || node.color || '#818cf8',
+        );
+        const secondaryAccent = new THREE.Color(
+          palette?.secondaryAccent || node.color || '#818cf8',
+        );
+        const rimHighlight = new THREE.Color(
+          palette?.rimHighlight || '#ffffff',
+        );
+        const haloColor = new THREE.Color(
+          palette?.haloColor || node.color || '#818cf8',
+        );
+        const haloOpacity = palette?.haloOpacity ?? 0.22;
+
+        const tier = progression?.structureTier ?? 1;
+        const visualScale = progression?.boundedVisualScale ?? 1.0;
+
+        // Core Sphere Mesh (Bounded Emissive Ceiling)
+        const nodeGeo = new THREE.SphereGeometry(0.55 * visualScale, 32, 32);
+        const nodeMat = new THREE.MeshStandardMaterial({
+          color: coreColor,
+          emissive: emissiveColor,
+          emissiveIntensity: Math.min(
+            1.25,
+            0.85 + (progression?.levelAuraIntensity ?? 1.0) * 0.25,
+          ),
+          roughness: 0.28,
+          metalness: 0.75,
+        });
+        const nodeMesh = new THREE.Mesh(nodeGeo, nodeMat);
+        nodeGroup.add(nodeMesh);
+
+        // Concentric Halo Disc (Bounded Opacity)
+        const haloGeo = new THREE.RingGeometry(
+          0.7 * visualScale,
+          0.95 * visualScale,
+          32,
+        );
+        const haloMat = new THREE.MeshBasicMaterial({
+          color: haloColor,
           transparent: true,
-          opacity: 0.55,
-          transmission: 0.82,
-          roughness: 0.08,
-          clearcoat: 1.0,
-          clearcoatRoughness: 0.08,
-          specularIntensity: 1.0,
+          opacity: Math.min(0.38, haloOpacity),
+          side: THREE.DoubleSide,
         });
-        const nodeShellMesh = new THREE.Mesh(nodeShellGeo, nodeShellMat);
-        nodeGroup.add(nodeShellMesh);
-      }
+        const haloMesh = new THREE.Mesh(haloGeo, haloMat);
+        haloMesh.rotation.x = Math.PI / 2;
+        nodeGroup.add(haloMesh);
 
-      if (tier >= 3) {
-        // Tier 3+: Primary Metallic Orbital Ring
-        const ring1Radius = 0.96 * visualScale;
-        const nodeRingGeo = new THREE.TorusGeometry(ring1Radius, 0.015, 16, 60);
-        const nodeRingMat = new THREE.MeshStandardMaterial({
-          color: colorVal,
-          emissive: colorVal,
-          emissiveIntensity: 1.2,
-          metalness: 0.92,
-          roughness: 0.1,
-        });
-        const nodeRing = new THREE.Mesh(nodeRingGeo, nodeRingMat);
-        nodeRing.rotation.x = Math.PI / 2.5;
-        nodeGroup.add(nodeRing);
-      }
+        // Progression Structural Archetypes (Tiers 2–6)
+        if (tier >= 2) {
+          const nodeRingGeo = new THREE.TorusGeometry(
+            1.02 * visualScale,
+            0.015,
+            16,
+            60,
+          );
+          const nodeRingMat = new THREE.MeshStandardMaterial({
+            color: secondaryAccent,
+            emissive: secondaryAccent,
+            emissiveIntensity: 0.85,
+            metalness: 0.92,
+            roughness: 0.12,
+          });
+          const nodeRing = new THREE.Mesh(nodeRingGeo, nodeRingMat);
+          nodeRing.rotation.x = Math.PI / 2.5;
+          nodeGroup.add(nodeRing);
+        }
 
-      if (tier >= 4) {
-        // Tier 4+: Dual Counter-Rotating Metallic Orbital Rings
-        const ring2Radius = 1.20 * visualScale;
-        const nodeRing2Geo = new THREE.TorusGeometry(ring2Radius, 0.012, 16, 60);
-        const nodeRing2Mat = new THREE.MeshStandardMaterial({
-          color: colorVal,
-          emissive: colorVal,
-          emissiveIntensity: 1.0,
-          metalness: 0.95,
-          roughness: 0.08,
-        });
-        const nodeRing2 = new THREE.Mesh(nodeRing2Geo, nodeRing2Mat);
-        nodeRing2.rotation.x = -Math.PI / 3;
-        nodeRing2.rotation.y = Math.PI / 4;
-        nodeGroup.add(nodeRing2);
-      }
+        if (tier >= 4) {
+          const ring2Radius = 1.2 * visualScale;
+          const nodeRing2Geo = new THREE.TorusGeometry(
+            ring2Radius,
+            0.012,
+            16,
+            60,
+          );
+          const nodeRing2Mat = new THREE.MeshStandardMaterial({
+            color: rimHighlight,
+            emissive: secondaryAccent,
+            emissiveIntensity: 0.8,
+            metalness: 0.95,
+            roughness: 0.08,
+          });
+          const nodeRing2 = new THREE.Mesh(nodeRing2Geo, nodeRing2Mat);
+          nodeRing2.rotation.x = -Math.PI / 3;
+          nodeRing2.rotation.y = Math.PI / 4;
+          nodeGroup.add(nodeRing2);
+        }
 
-      if (tier >= 5) {
-        // Tier 5+: Outer Geodesic Accent Lattice Shell
-        const latticeRadius = 0.88 * visualScale;
-        const nodeLatticeGeo = new THREE.IcosahedronGeometry(latticeRadius, 1);
-        const nodeLatticeMat = new THREE.MeshBasicMaterial({
-          color: colorVal,
-          wireframe: true,
-          transparent: true,
-          opacity: 0.35,
-        });
-        const nodeLattice = new THREE.Mesh(nodeLatticeGeo, nodeLatticeMat);
-        nodeGroup.add(nodeLattice);
-      }
+        if (tier >= 5) {
+          const latticeRadius = 0.88 * visualScale;
+          const nodeLatticeGeo = new THREE.IcosahedronGeometry(latticeRadius, 1);
+          const nodeLatticeMat = new THREE.MeshBasicMaterial({
+            color: rimHighlight,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.25,
+          });
+          const nodeLattice = new THREE.Mesh(nodeLatticeGeo, nodeLatticeMat);
+          nodeGroup.add(nodeLattice);
+        }
 
-      if (tier >= 6) {
-        // Tier 6: Triple Gyroscopic Orbital Rings (Deep Mastery)
-        const ring3Radius = 1.42 * visualScale;
-        const nodeRing3Geo = new THREE.TorusGeometry(ring3Radius, 0.010, 16, 60);
-        const nodeRing3Mat = new THREE.MeshStandardMaterial({
+        if (tier >= 6) {
+          const ring3Radius = 1.42 * visualScale;
+          const nodeRing3Geo = new THREE.TorusGeometry(
+            ring3Radius,
+            0.01,
+            16,
+            60,
+          );
+          const nodeRing3Mat = new THREE.MeshStandardMaterial({
+            color: rimHighlight,
+            emissive: secondaryAccent,
+            emissiveIntensity: 0.95,
+            metalness: 0.95,
+            roughness: 0.05,
+          });
+          const nodeRing3 = new THREE.Mesh(nodeRing3Geo, nodeRing3Mat);
+          nodeRing3.rotation.y = Math.PI / 2;
+          nodeGroup.add(nodeRing3);
+        }
+
+        // Point Light
+        const baseLightIntensity = Math.min(
+          1.6,
+          0.85 + (progression?.levelAuraIntensity ?? 1.0) * 0.35,
+        );
+        const nodeLight = new THREE.PointLight(
+          coreColor,
+          baseLightIntensity,
+          5.5 * visualScale,
+          1.6,
+        );
+        nodeGroup.add(nodeLight);
+        nodePointLights.set(node.id, nodeLight);
+
+        // 3D Connection Spline with beads
+        const midPoint = new THREE.Vector3(
+          basePos.x * 0.5 + (basePos.y > 0 ? 0.35 : -0.35),
+          basePos.y * 0.5 + (basePos.x > 0 ? -0.35 : 0.35),
+          basePos.z * 0.5 + 0.45,
+        );
+
+        const curve = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(0, 0, 0),
+          midPoint,
+          basePos.clone(),
+        ]);
+
+        const coreTubeGeo = new THREE.TubeGeometry(curve, 48, 0.012, 8, false);
+        const coreTubeMat = new THREE.MeshBasicMaterial({
           color: 0xffffff,
-          emissive: colorVal,
-          emissiveIntensity: 1.4,
-          metalness: 0.95,
-          roughness: 0.05,
+          transparent: true,
+          opacity: 0.85,
         });
-        const nodeRing3 = new THREE.Mesh(nodeRing3Geo, nodeRing3Mat);
-        nodeRing3.rotation.y = Math.PI / 2;
-        nodeGroup.add(nodeRing3);
-      }
+        const coreTubeMesh = new THREE.Mesh(coreTubeGeo, coreTubeMat);
+        curvesContainer.add(coreTubeMesh);
 
-      // Point Light (Radiance scaled with level)
-      const ptLightIntensity = (progression?.levelAuraIntensity ?? 1.5) * 1.6;
-      const nodeLight = new THREE.PointLight(colorVal, ptLightIntensity, 8 * visualScale, 1.5);
-      nodeGroup.add(nodeLight);
-      nodePointLights.set(node.id, nodeLight);
+        const glowTubeGeo = new THREE.TubeGeometry(curve, 48, 0.032, 8, false);
+        const glowTubeMat = new THREE.MeshStandardMaterial({
+          color: coreColor,
+          emissive: coreColor,
+          emissiveIntensity: 1.5,
+          transparent: true,
+          opacity: 0.38,
+        });
+        const glowTubeMesh = new THREE.Mesh(glowTubeGeo, glowTubeMat);
+        curvesContainer.add(glowTubeMesh);
 
-      // ── 3D Connection Spline with 3 Continuous Energy Beads ─────
-      const midPoint = new THREE.Vector3(
-        basePos.x * 0.5 + (basePos.y > 0 ? 0.35 : -0.35),
-        basePos.y * 0.5 + (basePos.x > 0 ? -0.35 : 0.35),
-        basePos.z * 0.5 + 0.45,
-      );
+        const beads: Array<{ mesh: THREE.Mesh; speed: number; offset: number }> = [];
 
-      const curve = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(0, 0, 0),
-        midPoint,
-        basePos.clone(),
-      ]);
+        const bead1Geo = new THREE.SphereGeometry(0.085, 12, 12);
+        const beadMat1 = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const beadMesh1 = new THREE.Mesh(bead1Geo, beadMat1);
+        curvesContainer.add(beadMesh1);
+        beads.push({ mesh: beadMesh1, speed: 0.28 + (idx % 3) * 0.04, offset: 0.0 });
 
-      // A. Hairline Optical Core
-      const coreTubeGeo = new THREE.TubeGeometry(curve, 48, 0.012, 8, false);
-      const coreTubeMat = new THREE.MeshBasicMaterial({
-        color: 0xffffff,
-        transparent: true,
-        opacity: 0.85,
+        const bead2Geo = new THREE.SphereGeometry(0.075, 10, 10);
+        const beadMat2 = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const beadMesh2 = new THREE.Mesh(bead2Geo, beadMat2);
+        curvesContainer.add(beadMesh2);
+        beads.push({ mesh: beadMesh2, speed: 0.32 + (idx % 2) * 0.03, offset: 0.36 });
+
+        const bead3Geo = new THREE.SphereGeometry(0.068, 10, 10);
+        const beadMat3 = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const beadMesh3 = new THREE.Mesh(bead3Geo, beadMat3);
+        curvesContainer.add(beadMesh3);
+        beads.push({ mesh: beadMesh3, speed: 0.26 + (idx % 4) * 0.03, offset: 0.72 });
+
+        const pulseGeo = new THREE.SphereGeometry(0.15, 14, 14);
+        const pulseMat = new THREE.MeshBasicMaterial({
+          color: new THREE.Color(paletteRef.current.pulse),
+          transparent: true,
+          opacity: 0,
+        });
+        const pulseMesh = new THREE.Mesh(pulseGeo, pulseMat);
+        curvesContainer.add(pulseMesh);
+
+        const surgeGroup = new THREE.Group();
+        surgeGroup.visible = false;
+        curvesContainer.add(surgeGroup);
+
+        const leadSurgeGeo = new THREE.SphereGeometry(0.28, 16, 16);
+        const leadSurgeMat = new THREE.MeshStandardMaterial({
+          color: 0xffffff,
+          emissive: coreColor,
+          emissiveIntensity: 5.5,
+          roughness: 0.08,
+          metalness: 0.9,
+        });
+        const leadSurgeMesh = new THREE.Mesh(leadSurgeGeo, leadSurgeMat);
+        surgeGroup.add(leadSurgeMesh);
+
+        const trailMeshes: THREE.Mesh[] = [];
+        const trailSizes = [0.22, 0.17, 0.13, 0.09];
+        const trailOffsets = [0.035, 0.07, 0.105, 0.14];
+        trailSizes.forEach((size, tIdx) => {
+          const tGeo = new THREE.SphereGeometry(size, 12, 12);
+          const tMat = new THREE.MeshBasicMaterial({
+            color: coreColor,
+            transparent: true,
+            opacity: 0.88 - tIdx * 0.18,
+          });
+          const tMesh = new THREE.Mesh(tGeo, tMat);
+          surgeGroup.add(tMesh);
+          trailMeshes.push(tMesh);
+        });
+
+        const surgePointLight = new THREE.PointLight(
+          coreColor,
+          0,
+          9 * visualScale,
+          1.8,
+        );
+        surgeGroup.add(surgePointLight);
+
+        curveStreams.push({
+          curve,
+          glowTubeMesh,
+          basePos,
+          baseLightIntensity,
+          ampX: 0.2,
+          ampY: 0.28,
+          ampZ: 0.16,
+          phaseX: idx * 1.73 + 0.5,
+          phaseY: idx * 2.41 + 1.2,
+          phaseZ: idx * 1.19 + 2.1,
+          freqX: 0.65 + (idx % 3) * 0.12,
+          freqY: 0.85 + (idx % 4) * 0.10,
+          freqZ: 0.55 + (idx % 2) * 0.15,
+          beads,
+          pulseMesh,
+          surgeGroup,
+          leadSurgeMesh,
+          trailMeshes,
+          trailOffsets,
+          surgePointLight,
+          targetNodeId: node.id,
+        });
       });
-      const coreTubeMesh = new THREE.Mesh(coreTubeGeo, coreTubeMat);
-      scene.add(coreTubeMesh);
+    };
 
-      // B. Outer Glowing Energy Stream Tube (Blends Skill Color with Core Palette)
-      const glowTubeGeo = new THREE.TubeGeometry(curve, 48, 0.032, 8, false);
-      const glowTubeMat = new THREE.MeshStandardMaterial({
-        color: colorVal,
-        emissive: colorVal,
-        emissiveIntensity: 1.5,
-        transparent: true,
-        opacity: 0.38,
-      });
-      const glowTubeMesh = new THREE.Mesh(glowTubeGeo, glowTubeMat);
-      scene.add(glowTubeMesh);
-
-      // C. 3 Staggered Continuous Traveling Energy Beads per Curve
-      const beads: Array<{ mesh: THREE.Mesh; speed: number; offset: number }> = [];
-
-      const bead1Geo = new THREE.SphereGeometry(0.085, 12, 12);
-      const beadMat1 = new THREE.MeshBasicMaterial({ color: 0xffffff });
-      const beadMesh1 = new THREE.Mesh(bead1Geo, beadMat1);
-      scene.add(beadMesh1);
-      beads.push({ mesh: beadMesh1, speed: 0.28 + (idx % 3) * 0.04, offset: 0.0 });
-
-      const bead2Geo = new THREE.SphereGeometry(0.075, 10, 10);
-      const beadMat2 = new THREE.MeshBasicMaterial({ color: 0xffffff });
-      const beadMesh2 = new THREE.Mesh(bead2Geo, beadMat2);
-      scene.add(beadMesh2);
-      beads.push({ mesh: beadMesh2, speed: 0.32 + (idx % 2) * 0.03, offset: 0.36 });
-
-      const bead3Geo = new THREE.SphereGeometry(0.068, 10, 10);
-      const beadMat3 = new THREE.MeshBasicMaterial({ color: 0xffffff });
-      const beadMesh3 = new THREE.Mesh(bead3Geo, beadMat3);
-      scene.add(beadMesh3);
-      beads.push({ mesh: beadMesh3, speed: 0.26 + (idx % 4) * 0.03, offset: 0.72 });
-
-      // D. Network Pulse Surge Bead
-      const pulseGeo = new THREE.SphereGeometry(0.15, 14, 14);
-      const pulseMat = new THREE.MeshBasicMaterial({
-        color: new THREE.Color(initialPal.pulse),
-        transparent: true,
-        opacity: 0,
-      });
-      const pulseMesh = new THREE.Mesh(pulseGeo, pulseMat);
-      scene.add(pulseMesh);
-
-      curveStreams.push({
-        curve,
-        glowTubeMesh,
-        basePos,
-        ampX: 0.20,
-        ampY: 0.28,
-        ampZ: 0.16,
-        phaseX: idx * 1.73 + 0.5,
-        phaseY: idx * 2.41 + 1.2,
-        phaseZ: idx * 1.19 + 2.1,
-        freqX: 0.65 + (idx % 3) * 0.12,
-        freqY: 0.85 + (idx % 4) * 0.10,
-        freqZ: 0.55 + (idx % 2) * 0.15,
-        beads,
-        pulseMesh,
-        targetNodeId: node.id,
-      });
-    });
+    rebuildSkillNodesRef.current = rebuildSkillNodes;
+    rebuildSkillNodes(nodesRef.current);
 
     // ── 7. Raycaster for Click Detection ─────────────────────────
     const raycaster = new THREE.Raycaster();
     const mouseVector = new THREE.Vector2();
 
     const handleCanvasClick = (e: MouseEvent) => {
+      const state = orbitStateRef.current;
+      if (state.hasMoved) return; // User was orbiting/dragging, ignore click
+
       const rect = renderer.domElement.getBoundingClientRect();
       if (rect.width <= 0 || rect.height <= 0) return;
       mouseVector.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -745,7 +983,10 @@ export function Cosmos3DScene({
       if (intersects.length > 0) {
         const hitGroup = intersects[0].object.parent;
         if (hitGroup && hitGroup.userData?.nodeData) {
-          onSelectNodeRef.current(hitGroup.userData.nodeData);
+          const nodeData = hitGroup.userData.nodeData as SceneNodeData;
+          const nodeIndex = nodesRef.current.findIndex((n) => n.id === nodeData.id);
+          soundEngine.playOrbSelect(nodeIndex >= 0 ? nodeIndex : 0);
+          onSelectNodeRef.current(nodeData);
         }
       }
     };
@@ -760,8 +1001,12 @@ export function Cosmos3DScene({
       camera.aspect = aspect;
 
       // Responsive Camera Framing: Adapt camera Z distance on narrow aspect ratios
-      const adaptedBaseZ = aspect < 1.35 ? 14.5 * (1.35 / Math.max(0.65, aspect)) : 14.5;
+      const adaptedBaseZ = aspect < 1.2 ? Math.min(22.0, 14.5 * (1.2 / Math.max(0.45, aspect))) : 14.5;
       baseCameraZRef.current = adaptedBaseZ;
+      if (!orbitStateRef.current.hasMoved) {
+        orbitStateRef.current.zoomDistance = adaptedBaseZ;
+        orbitStateRef.current.targetZoomDistance = adaptedBaseZ;
+      }
 
       camera.updateProjectionMatrix();
       renderer.setSize(w, h, false);
@@ -817,21 +1062,6 @@ export function Cosmos3DScene({
       coreLight1.color.lerp(targetAura, 0.08);
       coreLight2.color.lerp(targetAccent, 0.08);
 
-      // Damped Camera Parallax with Gentle Idle Orbit & Adaptive Z Distance
-      mousePosRef.current.x += (targetMouseRef.current.x - mousePosRef.current.x) * 0.04;
-      mousePosRef.current.y += (targetMouseRef.current.y - mousePosRef.current.y) * 0.04;
-
-      const idleCamX = Math.sin(elapsedTime * 0.5) * 0.3;
-      const idleCamY = Math.cos(elapsedTime * 0.4) * 0.2;
-
-      camera.position.x = mousePosRef.current.x * 1.6 + idleCamX;
-      camera.position.y = mousePosRef.current.y * 1.0 + idleCamY;
-      camera.position.z = baseCameraZRef.current;
-      camera.lookAt(0, 0, 0);
-
-      // ── Mastery Core Dynamics ────────────────────────────────────
-      coreGroup.position.y = Math.sin(elapsedTime * 1.5) * 0.22;
-
       // ── Cinematic Feedback Animation State Machine ───────────
       const cState = cinematicStateRef.current;
       const isCinematicActive = Boolean(
@@ -841,6 +1071,7 @@ export function Cosmos3DScene({
       let chargeRatio = 0;
       let transferRatio = 0;
       let absorptionRatio = 0;
+      let settleRatio = 0;
 
       if (isCinematicActive) {
         const nowMs = performance.now();
@@ -851,10 +1082,20 @@ export function Cosmos3DScene({
         } else if (elapsed < cState.tFocus + cState.tCoreCharge) {
           cinematicPhase = 'core_charge';
           chargeRatio = (elapsed - cState.tFocus) / cState.tCoreCharge;
+
+          if (!cState.coreChargeSoundPlayed) {
+            cState.coreChargeSoundPlayed = true;
+            soundEngine.playCoreCharge();
+          }
         } else if (elapsed < cState.tFocus + cState.tCoreCharge + cState.tTransfer) {
           cinematicPhase = 'transfer';
           transferRatio =
             (elapsed - (cState.tFocus + cState.tCoreCharge)) / cState.tTransfer;
+
+          if (!cState.surgeSoundPlayed) {
+            cState.surgeSoundPlayed = true;
+            soundEngine.playEnergySurge();
+          }
         } else if (
           elapsed <
           cState.tFocus + cState.tCoreCharge + cState.tTransfer + cState.tAbsorption
@@ -865,14 +1106,33 @@ export function Cosmos3DScene({
               (cState.tFocus + cState.tCoreCharge + cState.tTransfer)) /
             cState.tAbsorption;
 
-          if (
-            !cState.soundPlayed &&
-            (cState.significance === 'horizon' ||
-              feedbackEventRef.current?.crossedHorizon)
-          ) {
-            cState.soundPlayed = true;
-            soundEngine.playHorizonCross();
+          if (!cState.absorptionSoundPlayed) {
+            cState.absorptionSoundPlayed = true;
+            if (
+              cState.significance === 'horizon' ||
+              feedbackEventRef.current?.crossedHorizon
+            ) {
+              soundEngine.playHorizonCross();
+            } else {
+              soundEngine.playSkillAbsorption();
+            }
           }
+        } else if (
+          elapsed <
+          cState.tFocus +
+            cState.tCoreCharge +
+            cState.tTransfer +
+            cState.tAbsorption +
+            cState.tSettle
+        ) {
+          cinematicPhase = 'settle';
+          settleRatio =
+            (elapsed -
+              (cState.tFocus +
+                cState.tCoreCharge +
+                cState.tTransfer +
+                cState.tAbsorption)) /
+            cState.tSettle;
         } else {
           cinematicPhase = 'reveal';
           if (!cState.revealTriggered) {
@@ -883,9 +1143,123 @@ export function Cosmos3DScene({
         cState.phase = cinematicPhase;
       }
 
+      // ── Interactive 3D Orbit, Smooth Camera Dynamics & Cinematic Target Glide ──
+      mousePosRef.current.x +=
+        (targetMouseRef.current.x - mousePosRef.current.x) * 0.05;
+      mousePosRef.current.y +=
+        (targetMouseRef.current.y - mousePosRef.current.y) * 0.05;
+
+      const oState = orbitStateRef.current;
+      const selectedId = selectedNodeIdRef.current;
+      const hasActiveSelection = Boolean(selectedId);
+
+      const isIdleDrifting =
+        !oState.isDragging &&
+        !hasActiveSelection &&
+        !isCinematicActive &&
+        performance.now() - oState.lastInteractionTime > 2500;
+
+      if (isIdleDrifting) {
+        oState.targetOrbitAngleX += 0.0006;
+      }
+
+      // Smooth lerping of orbit rotation & zoom
+      oState.orbitAngleX = THREE.MathUtils.lerp(
+        oState.orbitAngleX,
+        oState.targetOrbitAngleX,
+        0.08,
+      );
+      oState.orbitAngleY = THREE.MathUtils.lerp(
+        oState.orbitAngleY,
+        oState.targetOrbitAngleY,
+        0.08,
+      );
+      oState.zoomDistance = THREE.MathUtils.lerp(
+        oState.zoomDistance,
+        oState.targetZoomDistance,
+        0.08,
+      );
+
+      // Target lookAt framing: centered at Core (0,0,0) unless cinematic focus event is running
+      if (isCinematicActive && cState.targetSkillId) {
+        const targetGroup = nodeMeshes.get(cState.targetSkillId);
+        if (targetGroup) {
+          const targetWorld = new THREE.Vector3();
+          targetGroup.getWorldPosition(targetWorld);
+          oState.targetLookAt.set(
+            targetWorld.x * 0.4,
+            targetWorld.y * 0.4,
+            targetWorld.z * 0.4,
+          );
+        }
+      } else {
+        oState.targetLookAt.set(0, 0, 0);
+      }
+
+      oState.currentLookAt.lerp(oState.targetLookAt, 0.08);
+
+      // Spherical coordinate system around currentLookAt
+      const cosY = Math.cos(oState.orbitAngleY);
+      const sinY = Math.sin(oState.orbitAngleY);
+      const cosX = Math.cos(oState.orbitAngleX);
+      const sinX = Math.sin(oState.orbitAngleX);
+
+      // Subtle mouse parallax (restrained so Cosmos remains centered)
+      const parallaxX = mousePosRef.current.x * 0.18;
+      const parallaxY = mousePosRef.current.y * 0.12;
+
+      camera.position.x =
+        oState.currentLookAt.x +
+        oState.zoomDistance * cosY * sinX +
+        parallaxX;
+      camera.position.y =
+        oState.currentLookAt.y +
+        oState.zoomDistance * sinY +
+        parallaxY;
+      camera.position.z =
+        oState.currentLookAt.z + oState.zoomDistance * cosY * cosX;
+      camera.lookAt(oState.currentLookAt);
+
+      // ── Hover Raycasting & Resonant Crystal Audio ───────────────
+      mouseVector.x = targetMouseRef.current.x;
+      mouseVector.y = targetMouseRef.current.y;
+      raycaster.setFromCamera(mouseVector, camera);
+
+      const interactiveHoverMeshes: THREE.Object3D[] = [];
+      nodeMeshes.forEach((group) => {
+        interactiveHoverMeshes.push(...group.children);
+      });
+
+      const hoverIntersects = raycaster.intersectObjects(
+        interactiveHoverMeshes,
+        false,
+      );
+      if (hoverIntersects.length > 0) {
+        const hitGroup = hoverIntersects[0].object.parent;
+        if (hitGroup && hitGroup.userData?.nodeData) {
+          const hitNodeId = hitGroup.userData.nodeData.id;
+          if (hitNodeId && hitNodeId !== hoveredNodeIdRef.current) {
+            hoveredNodeIdRef.current = hitNodeId;
+            const nodeIndex = nodesRef.current.findIndex(
+              (n) => n.id === hitNodeId,
+            );
+            soundEngine.playOrbHover(nodeIndex >= 0 ? nodeIndex : 0);
+            onHoverNodeRef.current?.(hitGroup.userData.nodeData);
+          }
+        }
+      } else if (hoveredNodeIdRef.current !== null) {
+        hoveredNodeIdRef.current = null;
+        onHoverNodeRef.current?.(null);
+      }
+
+      // ── Mastery Core Dynamics ────────────────────────────────────
+      coreGroup.position.y = Math.sin(elapsedTime * 1.5) * 0.22;
+
       const extraCoreRot =
         isCinematicActive && cinematicPhase === 'core_charge'
-          ? chargeRatio * 0.04
+          ? chargeRatio * 0.12
+          : isCinematicActive && cinematicPhase === 'transfer'
+          ? (1.0 - transferRatio) * 0.08
           : 0;
 
       crystalShell.rotation.y = elapsedTime * 0.45;
@@ -895,23 +1269,30 @@ export function Cosmos3DScene({
       innerCore.rotation.y = -elapsedTime * 0.75 - extraCoreRot;
       innerCore.rotation.z = elapsedTime * 0.4;
 
-      const pulseScale = 1.0 + Math.sin(elapsedTime * 2.5) * 0.08;
-      innerCore.scale.set(pulseScale, pulseScale, pulseScale);
+      const basePulseScale = 1.0 + Math.sin(elapsedTime * 2.5) * 0.08;
+      let finalCoreScale = basePulseScale;
+
+      if (cinematicPhase === 'core_charge') {
+        const contraction = Math.sin(chargeRatio * Math.PI) * 0.14;
+        const gatherBurst = chargeRatio > 0.6 ? (chargeRatio - 0.6) * 0.45 : 0;
+        finalCoreScale = basePulseScale * (1.0 - contraction + gatherBurst);
+      }
+      innerCore.scale.set(finalCoreScale, finalCoreScale, finalCoreScale);
 
       const basePulse = 2.4 + Math.sin(elapsedTime * 2.0) * 0.9;
       let feedbackCoreEmissive = 0;
       if (cinematicPhase === 'core_charge') {
         feedbackCoreEmissive =
-          chargeRatio * (cState.significance === 'horizon' ? 3.0 : 1.8);
+          chargeRatio * (cState.significance === 'horizon' ? 3.8 : 2.6);
       } else if (cinematicPhase === 'transfer') {
-        feedbackCoreEmissive = (1.0 - transferRatio) * 1.5;
+        feedbackCoreEmissive = (1.0 - transferRatio) * 2.0;
       }
       innerMat.emissiveIntensity = basePulse + feedbackCoreEmissive;
 
-      ring1.rotation.z = elapsedTime * 0.55 + extraCoreRot * 0.8;
+      ring1.rotation.z = elapsedTime * 0.55 + extraCoreRot * 1.5;
       ring1.rotation.y = Math.PI / 6 + Math.sin(elapsedTime * 0.6) * 0.15;
 
-      ring2.rotation.z = -elapsedTime * 0.42 - extraCoreRot * 0.8;
+      ring2.rotation.z = -elapsedTime * 0.42 - extraCoreRot * 1.5;
       ring2.rotation.x = -Math.PI / 4 + Math.cos(elapsedTime * 0.5) * 0.15;
 
       ring3.rotation.y = elapsedTime * 0.32;
@@ -922,17 +1303,8 @@ export function Cosmos3DScene({
       distantPlanetGroup.position.y = -9.5 + Math.sin(elapsedTime * 0.5) * 0.35;
 
       // ── Asynchronous Node Drift & Selection Visual Feedback ───────
-      const activePulseCycle = 7.0; // 7s pulse period
-      const pulseIndex =
-        Math.floor(elapsedTime / activePulseCycle) %
-        Math.max(1, curveStreams.length);
-      const pulseProgress = (elapsedTime % activePulseCycle) / 1.8; // 1.8s travel duration
-
       const liveWidth = container.clientWidth || 800;
       const liveHeight = container.clientHeight || 600;
-
-      const selectedId = selectedNodeIdRef.current;
-      const hasActiveSelection = Boolean(selectedId);
 
       curveStreams.forEach((stream, idx) => {
         const group = nodeMeshes.get(stream.targetNodeId);
@@ -954,9 +1326,17 @@ export function Cosmos3DScene({
         // B. Update 3D Spline Curve Endpoint to match moving node
         stream.curve.points[2].copy(group.position);
 
-        // C. Continuous Flowing Energy Beads along Curve
+        // C. Continuous Flowing Energy Beads along Curve (Slows down for dramatic anticipation during Focus/Gather)
+        const beadSpeedMultiplier = isCinematicActive
+          ? cinematicPhase === 'focus' || cinematicPhase === 'core_charge'
+            ? 0.35
+            : 0.65
+          : 1.0;
+
         stream.beads.forEach((bead) => {
-          const t = (elapsedTime * bead.speed + bead.offset) % 1.0;
+          const t =
+            (elapsedTime * (bead.speed * beadSpeedMultiplier) + bead.offset) %
+            1.0;
           const pt = stream.curve.getPointAt(t);
           bead.mesh.position.copy(pt);
 
@@ -965,88 +1345,117 @@ export function Cosmos3DScene({
           bead.mesh.scale.set(scalePulse, scalePulse, scalePulse);
         });
 
-        // D. Network Pulse Surge / Cinematic Energy Transfer Surge
-        const isCurrentPulseStream = idx === pulseIndex;
+        // D. Network Pulse Surge / Distinct Completion Surge
         const isTargetSkill = cState.targetSkillId === stream.targetNodeId;
         const pulseMat = stream.pulseMesh.material as THREE.MeshBasicMaterial;
         const tubeMat = stream.glowTubeMesh.material as THREE.MeshStandardMaterial;
 
         if (isCinematicActive && isTargetSkill && cinematicPhase === 'transfer') {
-          const pulsePt = stream.curve.getPointAt(transferRatio);
-          stream.pulseMesh.position.copy(pulsePt);
-          const pulseScale = 1.5 + Math.sin(transferRatio * Math.PI) * 0.8;
-          stream.pulseMesh.scale.set(pulseScale, pulseScale, pulseScale);
-          pulseMat.opacity = 0.95;
+          // Smooth acceleration and deceleration curve
+          const easedT =
+            transferRatio < 0.5
+              ? 2 * transferRatio * transferRatio
+              : -1 + (4 - 2 * transferRatio) * transferRatio;
 
-          tubeMat.opacity = 0.85;
+          stream.surgeGroup.visible = true;
+          const leadPt = stream.curve.getPointAt(easedT);
+          stream.leadSurgeMesh.position.copy(leadPt);
+
+          stream.trailMeshes.forEach((tMesh, tIdx) => {
+            const trailT = Math.max(0, easedT - stream.trailOffsets[tIdx]);
+            const trailPt = stream.curve.getPointAt(trailT);
+            tMesh.position.copy(trailPt);
+          });
+
+          stream.surgePointLight.position.copy(leadPt);
+          stream.surgePointLight.intensity =
+            7.0 + Math.sin(transferRatio * Math.PI) * 6.0;
+
+          pulseMat.opacity = 0;
+          tubeMat.opacity = 0.95;
           tubeMat.emissiveIntensity =
-            2.0 + Math.sin(transferRatio * Math.PI) * 3.5;
-        } else if (
-          isCurrentPulseStream &&
-          pulseProgress <= 1.0 &&
-          !isCinematicActive
-        ) {
-          const pulsePt = stream.curve.getPointAt(pulseProgress);
-          stream.pulseMesh.position.copy(pulsePt);
-
-          const opacity = Math.sin(pulseProgress * Math.PI) * 0.95;
-          pulseMat.opacity = opacity;
-          tubeMat.emissiveIntensity =
-            1.5 + Math.sin(pulseProgress * Math.PI) * 1.8;
-
-          if (pulseProgress > 0.8) {
-            const light = nodePointLights.get(stream.targetNodeId);
-            if (light) light.intensity = 2.8 + (1.0 - pulseProgress) * 4.0;
-          }
+            4.0 + Math.sin(transferRatio * Math.PI) * 4.0;
         } else {
+          stream.surgeGroup.visible = false;
+          stream.surgePointLight.intensity = 0;
           pulseMat.opacity = 0;
         }
 
         // ── Selection & Cinematic Lighting & Aura Amplification ────
         const isSelected = selectedId === stream.targetNodeId;
         const isHovered = hoveredNodeIdRef.current === stream.targetNodeId;
-        let targetScale = isSelected ? 1.3 : isHovered ? 1.18 : 1.0;
+        const idleBreathing =
+          1.0 + Math.sin(elapsedTime * 0.6 + idx * 1.5) * 0.015;
+        let targetScale = isSelected
+          ? 1.25
+          : isHovered
+            ? 1.12
+            : idleBreathing;
 
         if (isCinematicActive && isTargetSkill) {
           if (cinematicPhase === 'focus' || cinematicPhase === 'core_charge') {
-            targetScale = 1.25;
+            targetScale = 1.22;
           } else if (cinematicPhase === 'transfer') {
-            targetScale = 1.25 + Math.sin(transferRatio * Math.PI) * 0.12;
+            targetScale = 1.22 + Math.sin(transferRatio * Math.PI) * 0.1;
           } else if (cinematicPhase === 'absorption') {
-            targetScale =
-              1.25 +
-              Math.sin(absorptionRatio * Math.PI) *
-                (cState.significance === 'horizon' ? 0.45 : 0.28);
+            const isHorizon =
+              cState.significance === 'horizon' ||
+              Boolean(feedbackEventRef.current?.crossedHorizon);
+            const contract = Math.sin(absorptionRatio * Math.PI * 0.5) * 0.08;
+            const expand =
+              Math.sin(absorptionRatio * Math.PI) * (isHorizon ? 0.5 : 0.35);
+            targetScale = 1.22 * (1.0 - contract + expand);
+          } else if (cinematicPhase === 'settle') {
+            targetScale = 1.22 + (1.0 - settleRatio) * 0.06;
           }
         }
         group.scale.lerp(
           new THREE.Vector3(targetScale, targetScale, targetScale),
-          0.12,
+          0.14,
         );
+
+        const light = nodePointLights.get(stream.targetNodeId);
+        if (light) {
+          if (
+            isCinematicActive &&
+            isTargetSkill &&
+            cinematicPhase === 'absorption'
+          ) {
+            const isHorizon =
+              cState.significance === 'horizon' ||
+              Boolean(feedbackEventRef.current?.crossedHorizon);
+            light.intensity =
+              2.5 +
+              Math.sin(absorptionRatio * Math.PI) * (isHorizon ? 12.0 : 7.0);
+          } else if (isSelected) {
+            light.intensity = THREE.MathUtils.lerp(light.intensity, 2.2, 0.08);
+          } else if (isHovered) {
+            light.intensity = THREE.MathUtils.lerp(light.intensity, 1.7, 0.08);
+          } else {
+            light.intensity = THREE.MathUtils.lerp(
+              light.intensity,
+              stream.baseLightIntensity,
+              0.08,
+            );
+          }
+        }
 
         if (
           isCinematicActive &&
           isTargetSkill &&
           cinematicPhase === 'absorption'
         ) {
-          const light = nodePointLights.get(stream.targetNodeId);
-          if (light) {
-            light.intensity =
-              3.0 +
-              Math.sin(absorptionRatio * Math.PI) *
-                (cState.significance === 'horizon' ? 10.0 : 6.0);
-          }
           tubeMat.opacity = 0.7;
           tubeMat.emissiveIntensity = 2.5;
         } else if (isSelected) {
-          tubeMat.opacity = 0.65;
-          tubeMat.emissiveIntensity = 2.8;
+          tubeMat.opacity = 0.55;
+          tubeMat.emissiveIntensity = 2.0;
         } else if (hasActiveSelection || isCinematicActive) {
-          tubeMat.opacity = 0.2;
-          tubeMat.emissiveIntensity = 0.85;
+          tubeMat.opacity = 0.18;
+          tubeMat.emissiveIntensity = 0.75;
         } else {
-          tubeMat.opacity = 0.38;
-          tubeMat.emissiveIntensity = 1.5;
+          tubeMat.opacity = 0.32;
+          tubeMat.emissiveIntensity = 1.2;
         }
 
         // Rotate child rings
@@ -1063,13 +1472,28 @@ export function Cosmos3DScene({
           group.getWorldPosition(worldPos);
           const proj = worldPos.clone().project(camera);
 
-          const screenX = ((proj.x + 1) * liveWidth) / 2;
-          const screenY = ((-proj.y + 1) * liveHeight) / 2;
-          const depthFactor = THREE.MathUtils.clamp((worldPos.z + 4) / 8, 0.78, 1.22);
-          const opacity = proj.z < 1 ? THREE.MathUtils.clamp(depthFactor, 0.72, 1) : 0;
+          const isVisibleInFrustum =
+            proj.z < 1.0 &&
+            proj.x >= -1.02 &&
+            proj.x <= 1.02 &&
+            proj.y >= -1.02 &&
+            proj.y <= 1.02;
 
-          labelEl.style.transform = `translate3d(${screenX}px, ${screenY}px, 0) translate(-50%, -50%) scale(${depthFactor})`;
-          labelEl.style.opacity = `${opacity}`;
+          if (isVisibleInFrustum) {
+            const screenX = ((proj.x + 1) * liveWidth) / 2;
+            const screenY = ((-proj.y + 1) * liveHeight) / 2;
+            const depthFactor = THREE.MathUtils.clamp((worldPos.z + 4) / 8, 0.78, 1.22);
+            const opacity = THREE.MathUtils.clamp(depthFactor, 0.72, 1);
+
+            labelEl.style.display = 'block';
+            labelEl.style.pointerEvents = 'auto';
+            labelEl.style.transform = `translate3d(${screenX}px, ${screenY}px, 0) translate(-50%, -50%) scale(${depthFactor})`;
+            labelEl.style.opacity = `${opacity}`;
+          } else {
+            labelEl.style.display = 'none';
+            labelEl.style.pointerEvents = 'none';
+            labelEl.style.opacity = '0';
+          }
         }
       });
 
@@ -1081,6 +1505,7 @@ export function Cosmos3DScene({
 
     // ── 10. Complete Cleanup on Unmount ──────────────────────────
     return () => {
+      rebuildSkillNodesRef.current = null;
       if (animFrameId) cancelAnimationFrame(animFrameId);
       resizeObserver.disconnect();
       renderer.domElement.removeEventListener('click', handleCanvasClick);
@@ -1090,17 +1515,38 @@ export function Cosmos3DScene({
       composer.dispose();
       renderer.dispose();
     };
-  }, [nodes, globalLevel]);
+  }, [globalLevel]);
 
   return (
     <div
       ref={mountRef}
+      onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={handlePointerUp}
+      onWheel={handleWheel}
       className={cn(
         'relative w-full h-[520px] sm:h-[620px] lg:h-[680px] overflow-hidden select-none',
+        isDraggingCanvas ? 'cursor-grabbing' : 'cursor-grab',
         className,
       )}
     >
+      {/* Floating Re-Center Orbit Button (Appears when camera has been manually rotated/zoomed) */}
+      {hasCustomOrbit && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleResetCamera();
+          }}
+          className="absolute bottom-20 right-4 z-40 px-2.5 py-1.5 rounded-full bg-surface/85 border border-edge/80 hover:border-accent/60 text-zinc-400 hover:text-zinc-100 text-[11px] font-semibold flex items-center gap-1.5 backdrop-blur-xl shadow-lg transition-all cursor-pointer animate-fade-in pointer-events-auto"
+          title="Re-Center Cosmos View"
+        >
+          <RotateCcw size={12} className="text-accent" />
+          <span>Re-Center</span>
+        </button>
+      )}
+
       {/* ── 2D-in-3D Projected Holographic Node Badges ────────── */}
       {nodes.map((node) => {
         const isSelected = selectedNodeId === node.id;
