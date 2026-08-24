@@ -133,30 +133,36 @@ export function SkillJourneyPanel({
         aria-hidden="true"
       />
 
-      {/* ── Main Skill Journey Container (Compact Floating Overlay Below YOUR JOURNEY) ───── */}
+      {/* ── Holographic Contextual Window (Positioned Safely Below YOUR JOURNEY) ───── */}
       <aside
         ref={panelRef}
         onPointerDown={(e) => e.stopPropagation()}
+        style={{
+          background: `radial-gradient(ellipse at 20% 0%, ${node.color}18 0%, transparent 65%), rgba(7, 10, 22, 0.82)`,
+          boxShadow: `0 20px 48px -10px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.08), 0 0 28px -4px ${node.color}25, inset 0 1px 1px 0 rgba(255, 255, 255, 0.16)`,
+        }}
         className={cn(
-          // Desktop & Tablet: Floating on the left, positioned safely below YOUR JOURNEY HUD
+          // Desktop & Tablet: Floating Holographic Window on the left, below YOUR JOURNEY HUD
           'md:absolute md:left-3 sm:md:left-4 md:top-[128px] md:w-[310px] lg:w-[330px] md:max-h-[min(460px,calc(100dvh-128px-72px))] md:z-40',
-          'md:rounded-3xl md:border md:border-edge/80 md:bg-[#070a16]/95 md:backdrop-blur-xl md:shadow-2xl md:shadow-black/90',
+          'md:rounded-3xl md:backdrop-blur-2xl',
           // Mobile Fixed Bottom Sheet
-          'fixed inset-x-0 bottom-0 z-50 max-h-[82dvh] rounded-t-3xl border-t border-edge/80 bg-[#070a16]/98 backdrop-blur-2xl shadow-2xl p-4 sm:p-5 md:p-4',
-          'flex flex-col justify-between overflow-y-auto select-none transition-all duration-300 ease-out animate-fade-in',
+          'fixed inset-x-0 bottom-0 z-50 max-h-[82dvh] rounded-t-3xl border-t border-white/10 backdrop-blur-2xl p-4 sm:p-5 md:p-4',
+          'flex flex-col justify-between overflow-y-auto select-none transition-all duration-300 ease-out animate-scale-in',
           className,
         )}
         aria-label={`Skill Journey for ${node.name}`}
       >
         <div className="space-y-3">
-          {/* ── 1. Compact Header ───────────────────────────────── */}
-          <div className="flex items-start justify-between gap-2.5 pb-2.5 border-b border-edge/40">
+          {/* ── 1. Holographic Header ───────────────────────────── */}
+          <div className="flex items-start justify-between gap-2.5 pb-2.5 border-b border-white/[0.08]">
             <div className="flex items-center gap-2.5 min-w-0">
+              {/* Luminous Node Icon */}
               <div
-                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0 border border-white/20 shadow-md"
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0 border shadow-md transition-transform duration-300"
                 style={{
-                  backgroundColor: `${node.color}25`,
-                  boxShadow: `0 0 16px ${node.color}40`,
+                  backgroundColor: `${node.color}20`,
+                  borderColor: `${node.color}50`,
+                  boxShadow: `0 0 16px ${node.color}35`,
                 }}
               >
                 {node.icon}
@@ -164,17 +170,24 @@ export function SkillJourneyPanel({
 
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5 truncate">
-                  <h3 className="text-sm font-bold text-zinc-100 uppercase tracking-tight truncate">
+                  <h3 className="text-sm font-bold text-white uppercase tracking-tight truncate drop-shadow-sm">
                     {node.name}
                   </h3>
-                  <span className="flex items-center gap-0.5 text-[9px] font-bold text-accent px-1.5 py-0.2 rounded-full bg-accent/15 border border-accent/30 flex-shrink-0">
+                  <span
+                    className="flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.2 rounded-full border flex-shrink-0"
+                    style={{
+                      backgroundColor: `${node.color}18`,
+                      borderColor: `${node.color}40`,
+                      color: node.color,
+                    }}
+                  >
                     <Zap size={9} className="fill-current" />
                     Lv.{node.level}
                   </span>
                 </div>
 
                 <div className="flex items-center gap-1.5 text-[11px] text-zinc-400">
-                  <span className="font-semibold text-zinc-300">
+                  <span className="font-semibold text-zinc-200">
                     {node.formattedDuration}
                   </span>
                   <span className="text-zinc-600">•</span>
@@ -194,24 +207,24 @@ export function SkillJourneyPanel({
                 title="Delete Skill"
                 aria-label="Delete Skill"
               >
-                <Trash2 size={15} />
+                <Trash2 size={14} />
               </button>
 
               <button
                 type="button"
                 onClick={onClose}
-                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-surface transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 title="Close Journey Panel (Esc)"
                 aria-label="Close"
               >
-                <X size={16} />
+                <X size={15} />
               </button>
             </div>
           </div>
 
           {/* ── 2. Compact Category Selector ────────────────────── */}
           <div className="relative" ref={categoryMenuRef}>
-            <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-surface/60 border border-edge/50 text-xs">
+            <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-xs">
               <div className="flex items-center gap-1.5 min-w-0">
                 <span className="text-[9px] uppercase font-bold text-zinc-500 tracking-wider">
                   Journey:
@@ -225,16 +238,16 @@ export function SkillJourneyPanel({
               <button
                 type="button"
                 onClick={() => setShowCategoryMenu((prev) => !prev)}
-                className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface hover:bg-surface-elevated border border-edge/60 text-[10px] font-medium text-accent hover:text-indigo-300 transition-colors cursor-pointer"
+                className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-[10px] font-medium text-zinc-300 hover:text-white transition-colors cursor-pointer"
               >
                 <span>Edit</span>
-                <ChevronDown size={11} className={cn('transition-transform', showCategoryMenu && 'rotate-180')} />
+                <ChevronDown size={11} className={cn('transition-transform duration-200', showCategoryMenu && 'rotate-180')} />
               </button>
             </div>
 
             {/* Dropdown Menu */}
             {showCategoryMenu && (
-              <div className="absolute left-0 right-0 top-full mt-1 z-50 p-1.5 rounded-xl bg-[#0b0e22] border border-edge/80 shadow-2xl space-y-0.5 animate-fade-in">
+              <div className="absolute left-0 right-0 top-full mt-1 z-50 p-1.5 rounded-xl bg-[#0b0e22]/95 border border-white/15 backdrop-blur-2xl shadow-2xl space-y-0.5 animate-scale-in">
                 {CATEGORY_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
@@ -244,7 +257,7 @@ export function SkillJourneyPanel({
                       'w-full flex items-center justify-between px-2 py-1 rounded-lg text-xs font-medium text-left transition-colors cursor-pointer',
                       currentCategory === opt.value
                         ? 'bg-accent/20 text-accent border border-accent/40 font-bold'
-                        : 'text-zinc-300 hover:bg-surface hover:text-white',
+                        : 'text-zinc-300 hover:bg-white/10 hover:text-white',
                     )}
                   >
                     <span className="flex items-center gap-1.5 text-[11px]">
@@ -261,15 +274,19 @@ export function SkillJourneyPanel({
           </div>
 
           {/* ── 3. Current Stage & Next Horizon ─────────────────── */}
-          <div className="rounded-2xl bg-surface/80 border border-edge/70 p-3 space-y-2 shadow-inner">
+          <div className="rounded-2xl bg-white/[0.04] border border-white/[0.08] p-3 space-y-2 shadow-inner">
             <div className="flex items-center justify-between">
-              <span className="text-[9px] font-bold uppercase tracking-wider text-accent flex items-center gap-1">
-                <Layers size={11} />
+              <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1">
+                <Layers size={11} className="text-accent" />
                 Current Stage
               </span>
               <span
-                className="px-2 py-0.2 rounded text-[9px] font-black uppercase tracking-wider bg-canvas/80 border border-edge/60"
-                style={{ color: node.color }}
+                className="px-2 py-0.2 rounded text-[9px] font-black uppercase tracking-wider border shadow-xs"
+                style={{
+                  backgroundColor: `${node.color}20`,
+                  borderColor: `${node.color}50`,
+                  color: node.color,
+                }}
               >
                 {currentStage.name}
               </span>
@@ -286,18 +303,18 @@ export function SkillJourneyPanel({
                 <span>
                   {totalHours.toFixed(1)}h / {stageMax >= 10000 ? '1,200h+' : `${stageMax}h`}
                 </span>
-                <span className="text-zinc-300 font-semibold">
+                <span className="text-zinc-200 font-semibold">
                   {Math.round(stageProgressPercent)}%
                 </span>
               </div>
 
-              <div className="w-full h-1.5 rounded-full bg-canvas/90 border border-edge/40 overflow-hidden relative">
+              <div className="w-full h-1.5 rounded-full bg-black/40 border border-white/[0.06] overflow-hidden relative">
                 <div
                   className="h-full rounded-full transition-all duration-700"
                   style={{
                     width: `${stageProgressPercent}%`,
                     backgroundColor: node.color,
-                    boxShadow: `0 0 10px ${node.color}80`,
+                    boxShadow: `0 0 12px ${node.color}90`,
                   }}
                 />
               </div>
@@ -305,7 +322,7 @@ export function SkillJourneyPanel({
 
             {/* Next Horizon Checkpoint */}
             {nextHorizon ? (
-              <div className="pt-1.5 border-t border-edge/30 flex items-center justify-between text-[11px]">
+              <div className="pt-1.5 border-t border-white/[0.06] flex items-center justify-between text-[11px]">
                 <div className="flex items-center gap-1 text-zinc-300">
                   <Compass size={12} className="text-cyan-400 flex-shrink-0" />
                   <span className="font-bold">Next: {nextHorizon}h</span>
@@ -317,7 +334,7 @@ export function SkillJourneyPanel({
                 )}
               </div>
             ) : (
-              <div className="pt-1.5 border-t border-edge/30 flex items-center gap-1 text-[11px] text-zinc-300">
+              <div className="pt-1.5 border-t border-white/[0.06] flex items-center gap-1 text-[11px] text-zinc-300">
                 <Sparkles size={12} className="text-amber-400" />
                 <span className="font-bold">Journey Milestone Reached</span>
               </div>
@@ -333,7 +350,7 @@ export function SkillJourneyPanel({
               </span>
             </div>
 
-            <div className="max-h-[110px] overflow-y-auto pr-1 pl-4 relative space-y-2 before:absolute before:left-1.5 before:top-1.5 before:bottom-1.5 before:w-0.5 before:bg-edge/50">
+            <div className="max-h-[110px] overflow-y-auto pr-1 pl-4 relative space-y-2 before:absolute before:left-1.5 before:top-1.5 before:bottom-1.5 before:w-0.5 before:bg-white/10">
               {profile.stages.map((stg) => {
                 const isCompleted = totalHours >= stg.maxHours && stg.maxHours < 10000;
                 const isCurrent = currentStage.id === stg.id;
@@ -348,7 +365,7 @@ export function SkillJourneyPanel({
                           ? 'bg-accent/20 border-accent text-accent'
                           : isCurrent
                           ? 'bg-cyan-400/20 border-cyan-400 ring-2 ring-cyan-400/40 shadow-[0_0_8px_rgba(34,211,238,0.7)]'
-                          : 'bg-canvas/80 border-edge/60',
+                          : 'bg-white/5 border-white/15 text-zinc-600',
                       )}
                     >
                       {isCompleted ? (
@@ -387,12 +404,12 @@ export function SkillJourneyPanel({
         </div>
 
         {/* ── 5. Primary Start Focus CTA ───────────────────────── */}
-        <div className="pt-2.5 mt-2 border-t border-edge/50">
+        <div className="pt-2.5 mt-2 border-t border-white/[0.08]">
           <Button
             variant="primary"
             size="sm"
             onClick={() => onStartFocus(node.id)}
-            className="w-full font-bold gap-1.5 py-2 text-xs shadow-[0_0_16px_rgba(129,140,248,0.4)] hover:shadow-[0_0_24px_rgba(129,140,248,0.6)] cursor-pointer h-8.5"
+            className="w-full font-bold gap-1.5 py-2 text-xs shadow-[0_0_18px_rgba(129,140,248,0.4)] hover:shadow-[0_0_26px_rgba(129,140,248,0.6)] cursor-pointer h-8.5"
           >
             <Play size={13} className="fill-current" />
             <span>Start Focus on {node.name}</span>
