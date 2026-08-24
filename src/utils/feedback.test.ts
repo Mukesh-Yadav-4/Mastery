@@ -3,7 +3,7 @@ import { getSkillProgressionState } from './progression';
 import { getSessionXPBreakdown, secondsToHours, calculateLevelInfo } from './calculations';
 import type { CosmicFeedbackEvent } from '../types';
 
-describe('Phase 6 — Cosmic Feedback Event Architecture', () => {
+describe('Phase 6 — Cosmic Feedback Experience & Event Architecture', () => {
   it('correctly calculates XP breakdown without duplicate calculation', () => {
     // 30 minute session (1800s): 30 base XP + 4 completion bonus = 34 total XP
     const breakdown = getSessionXPBreakdown(1800, 'completed');
@@ -92,5 +92,23 @@ describe('Phase 6 — Cosmic Feedback Event Architecture', () => {
     expect(event.xpEarned).toBe(34);
     expect(event.significance).toBe('normal');
     expect(event.newHours).toBeGreaterThan(event.previousHours);
+  });
+
+  it('ensures session XP calculation is purely idempotent', () => {
+    // Calling getSessionXPBreakdown multiple times with same arguments produces identical outputs
+    const firstCall = getSessionXPBreakdown(3600, 'completed');
+    const secondCall = getSessionXPBreakdown(3600, 'completed');
+    expect(firstCall.totalXP).toBe(secondCall.totalXP);
+    expect(firstCall.totalXP).toBe(68); // 60 base + 8 bonus
+  });
+
+  it('ensures progression state evolves monotonically', () => {
+    const s0 = getSkillProgressionState('s1', 'Go', 0, 1, 'generic', 100);
+    const s1 = getSkillProgressionState('s1', 'Go', 3600 * 10, 2, 'generic', 100);
+    const s2 = getSkillProgressionState('s1', 'Go', 3600 * 50, 5, 'generic', 100);
+
+    expect(s1.boundedVisualScale).toBeGreaterThanOrEqual(s0.boundedVisualScale);
+    expect(s2.boundedVisualScale).toBeGreaterThanOrEqual(s1.boundedVisualScale);
+    expect(s2.structureTier).toBeGreaterThanOrEqual(s1.structureTier);
   });
 });
