@@ -1,9 +1,24 @@
 import { describe, it, expect } from 'vitest';
 import { getSkillProgressionState } from './progression';
 import { getSessionXPBreakdown, secondsToHours, calculateLevelInfo } from './calculations';
-import type { CosmicFeedbackEvent } from '../types';
+import { createSyntheticFeedbackEvent } from './devFeedback';
+import type { Skill, CosmicFeedbackEvent } from '../types';
 
 describe('Phase 6 — Cosmic Feedback Experience & Event Architecture', () => {
+  const mockSkill: Skill = {
+    id: 'skill-dev-1',
+    userId: 'user-1',
+    name: 'Quantum Physics',
+    description: 'Deliberate study of quantum mechanics',
+    category: 'creative',
+    icon: '⚛️',
+    color: '#818cf8',
+    targetHours: 100,
+    isArchived: false,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
   it('correctly calculates XP breakdown without duplicate calculation', () => {
     // 30 minute session (1800s): 30 base XP + 4 completion bonus = 34 total XP
     const breakdown = getSessionXPBreakdown(1800, 'completed');
@@ -95,11 +110,10 @@ describe('Phase 6 — Cosmic Feedback Experience & Event Architecture', () => {
   });
 
   it('ensures session XP calculation is purely idempotent', () => {
-    // Calling getSessionXPBreakdown multiple times with same arguments produces identical outputs
     const firstCall = getSessionXPBreakdown(3600, 'completed');
     const secondCall = getSessionXPBreakdown(3600, 'completed');
     expect(firstCall.totalXP).toBe(secondCall.totalXP);
-    expect(firstCall.totalXP).toBe(68); // 60 base + 8 bonus
+    expect(firstCall.totalXP).toBe(68);
   });
 
   it('ensures progression state evolves monotonically', () => {
@@ -110,5 +124,68 @@ describe('Phase 6 — Cosmic Feedback Experience & Event Architecture', () => {
     expect(s1.boundedVisualScale).toBeGreaterThanOrEqual(s0.boundedVisualScale);
     expect(s2.boundedVisualScale).toBeGreaterThanOrEqual(s1.boundedVisualScale);
     expect(s2.structureTier).toBeGreaterThanOrEqual(s1.structureTier);
+  });
+
+  // ── Development Preview & Synthetic Event Suite ──────────────
+  it('generates valid synthetic events for all duration presets without mutating real data', () => {
+    const durations = [
+      30 * 60,   // 30m
+      60 * 60,   // 1h
+      120 * 60,  // 2h
+      300 * 60,  // 5h
+      1500 * 60, // 25h
+      3000 * 60, // 50h
+    ];
+
+    durations.forEach((dur) => {
+      const syntheticEvent = createSyntheticFeedbackEvent(
+        mockSkill,
+        3600 * 5, // 5 hours current
+        dur,
+        250, // 250 current global XP
+      );
+
+      expect(syntheticEvent.id.startsWith('dev-preview-')).toBe(true);
+      expect(syntheticEvent.skillId).toBe(mockSkill.id);
+      expect(syntheticEvent.durationSeconds).toBe(dur);
+      expect(syntheticEvent.xpEarned).toBeGreaterThan(0);
+      expect(syntheticEvent.newHours).toBeGreaterThan(syntheticEvent.previousHours);
+      expect(['short', 'normal', 'long', 'horizon']).toContain(syntheticEvent.significance);
+    });
+  });
+
+  it('generates synthetic events with forced special test conditions', () => {
+    // 1. Forced Horizon Crossing
+    const horizonEvent = createSyntheticFeedbackEvent(
+      mockSkill,
+      3600 * 2,
+      1800,
+      100,
+      { forceHorizon: true },
+    );
+    expect(horizonEvent.crossedHorizon).toBe(true);
+    expect(horizonEvent.significance).toBe('horizon');
+
+    // 2. Forced Stage Transition
+    const stageEvent = createSyntheticFeedbackEvent(
+      mockSkill,
+      3600 * 2,
+      1800,
+      100,
+      { forceStage: true },
+    );
+    expect(stageEvent.crossedStage).toBe(true);
+    expect(stageEvent.stageTransitionTriggered).toBe(true);
+
+    // 3. Forced Level Up
+    const levelEvent = createSyntheticFeedbackEvent(
+      mockSkill,
+      3600 * 2,
+      1800,
+      100,
+      { forceLevelUp: true },
+    );
+    expect(levelEvent.didLevelUp).toBe(true);
+    expect(levelEvent.didSkillLevelUp).toBe(true);
   });
 });

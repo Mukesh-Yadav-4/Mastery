@@ -10,6 +10,7 @@ import { getSkillProgressionState } from '../../utils/progression';
 import type { CosmicNodeData } from './CosmicNode';
 import { Plus, Sparkles } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { CosmicDevTools } from '../dev/CosmicDevTools';
 
 export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => void }) {
   const {
@@ -204,6 +205,9 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
           onFeedbackPhaseChange={setFeedbackPhase}
           className="w-full h-full"
         />
+
+        {/* Development-Only Cinematic Preview & Simulation Tooling */}
+        <CosmicDevTools />
       </div>
     </section>
   );

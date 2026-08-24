@@ -117,17 +117,24 @@ export function CosmicFeedbackOverlay({
             </div>
           </div>
 
-          <span
-            className="flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.2 rounded-full border flex-shrink-0"
-            style={{
-              backgroundColor: `${event.skillColor}18`,
-              borderColor: `${event.skillColor}40`,
-              color: event.skillColor,
-            }}
-          >
-            <Zap size={9} className="fill-current" />
-            Lv.{event.newSkillLevel.level}
-          </span>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {event.id.startsWith('dev-preview-') && (
+              <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 uppercase tracking-wider">
+                Preview
+              </span>
+            )}
+            <span
+              className="flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.2 rounded-full border"
+              style={{
+                backgroundColor: `${event.skillColor}18`,
+                borderColor: `${event.skillColor}40`,
+                color: event.skillColor,
+              }}
+            >
+              <Zap size={9} className="fill-current" />
+              Lv.{event.newSkillLevel.level}
+            </span>
+          </div>
         </div>
 
         {/* ── 2. Horizon Crossing Announcement (if triggered) ── */}
