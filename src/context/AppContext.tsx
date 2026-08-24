@@ -9,6 +9,7 @@ import {
 import type { ReactNode } from 'react';
 import type {
   Skill,
+  SkillCategory,
   FocusSession,
   MilestoneRecord,
   TimerState,
@@ -68,6 +69,7 @@ interface AppContextValue {
 
   // Skills
   createSkill: (data: NewSkillData) => void;
+  updateSkillCategory: (skillId: string, category: SkillCategory) => void;
   archiveSkill: (skillId: string) => void;
   deleteSkill: (skillId: string) => void;
 
@@ -346,6 +348,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [user, loadData],
   );
 
+  const handleUpdateSkillCategory = useCallback(
+    (skillId: string, category: SkillCategory) => {
+      if (!user) return;
+      db.updateSkillCategory(user.id, skillId, category);
+      loadData();
+    },
+    [user, loadData],
+  );
+
   const handleArchiveSkill = useCallback(
     (skillId: string) => {
       if (!user) return;
@@ -405,6 +416,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         completeTimer,
         cancelTimer,
         createSkill: handleCreateSkill,
+        updateSkillCategory: handleUpdateSkillCategory,
         archiveSkill: handleArchiveSkill,
         deleteSkill: handleDeleteSkill,
         celebration,

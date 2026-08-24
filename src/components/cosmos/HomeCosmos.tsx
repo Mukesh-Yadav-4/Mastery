@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Cosmos3DScene, type SceneNodeData } from './Cosmos3DScene';
 import { CosmicHUD } from './CosmicHUD';
@@ -30,6 +30,7 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
         sp.totalSeconds,
         sp.skillLevel.level,
         sp.skill.category,
+        sp.skill.targetHours,
       );
 
       return {
@@ -78,10 +79,17 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
     return hudNode;
   }, [sceneNodes, activeSelectedId]);
 
-  const handleSelectNode = (node: SceneNodeData) => {
-    setSelectedNodeId(node.id);
-    setIsJourneyOpen(true);
-  };
+  const handleSelectNode = useCallback(
+    (node: SceneNodeData) => {
+      if (selectedNodeId === node.id && isJourneyOpen) {
+        setIsJourneyOpen(false);
+      } else {
+        setSelectedNodeId(node.id);
+        setIsJourneyOpen(true);
+      }
+    },
+    [selectedNodeId, isJourneyOpen],
+  );
 
   const handleStartFocus = (skillId: string) => {
     if (!skillId) {
@@ -95,15 +103,15 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
   const hasSkills = sceneNodes.length > 0;
 
   return (
-    <section className="relative w-full rounded-3xl overflow-hidden bg-[#060813] border border-edge/60 shadow-2xl shadow-black/90 transition-all">
+    <section className="relative w-full h-full overflow-hidden bg-[#060813] select-none">
       {/* ── Ambient Radial Atmosphere Highlights ─────────────── */}
       <div className="absolute inset-0 pointer-events-none -z-10 overflow-hidden">
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[500px] rounded-full bg-indigo-950/40 blur-[130px] opacity-70" />
-        <div className="absolute bottom-10 right-10 w-[350px] h-[350px] rounded-full bg-cyan-950/25 blur-[110px] opacity-50" />
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[600px] rounded-full bg-indigo-950/40 blur-[140px] opacity-70" />
+        <div className="absolute bottom-10 right-10 w-[450px] h-[450px] rounded-full bg-cyan-950/25 blur-[120px] opacity-50" />
       </div>
 
-      {/* ── 3D WebGL Cosmic Growth Scene Viewport (Fullscreen Dominated) ── */}
-      <div className="relative w-full h-[calc(100dvh-7.5rem)] min-h-[580px] max-h-[900px]">
+      {/* ── 3D WebGL Cosmic Growth Scene Viewport (True Fullscreen Canvas) ── */}
+      <div className="relative w-full h-full">
         {/* Floating Holographic HUD */}
         <CosmicHUD
           levelInfo={globalLevelInfo}
@@ -124,7 +132,7 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
           </div>
         )}
 
-        {/* Interactive Full Skill Journey Panel */}
+        {/* Interactive Full Skill Journey Panel (Floating Overlay) */}
         {isJourneyOpen && selectedNode && (
           <SkillJourneyPanel
             node={selectedNode}
@@ -136,7 +144,7 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
         {/* Zero-Skill Empty State Prompt Overlay */}
         {!hasSkills && (
           <div className="absolute inset-0 z-20 flex flex-col items-center justify-center pointer-events-none p-6 text-center">
-            <div className="max-w-md space-y-3 bg-surface/70 border border-edge/60 p-6 rounded-3xl backdrop-blur-md shadow-2xl pointer-events-auto">
+            <div className="max-w-md space-y-3 bg-surface/80 border border-edge/80 p-6 rounded-3xl backdrop-blur-xl shadow-2xl pointer-events-auto">
               <div className="w-12 h-12 mx-auto rounded-2xl bg-accent/20 border border-accent/40 flex items-center justify-center text-accent shadow-[0_0_16px_rgba(129,140,248,0.4)]">
                 <Sparkles size={22} />
               </div>

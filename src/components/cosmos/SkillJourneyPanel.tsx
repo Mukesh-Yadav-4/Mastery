@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { SceneNodeData } from './Cosmos3DScene';
 import { getProgressionProfile } from '../../utils/progression';
 import { useApp } from '../../context/AppContext';
 import { DeleteSkillModal } from '../skills/DeleteSkillModal';
 import { Button } from '../ui/Button';
+import type { SkillCategory } from '../../types';
 import {
   X,
   Play,
@@ -13,6 +14,7 @@ import {
   Sparkles,
   Layers,
   Trash2,
+  ChevronDown,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -23,23 +25,36 @@ interface SkillJourneyPanelProps {
   className?: string;
 }
 
+const CATEGORY_OPTIONS: { value: SkillCategory; label: string; icon: string }[] = [
+  { value: 'programming', label: 'Programming', icon: '💻' },
+  { value: 'language', label: 'Language', icon: '🗣️' },
+  { value: 'music', label: 'Music', icon: '🎵' },
+  { value: 'creative', label: 'Creative Arts', icon: '🎨' },
+  { value: 'fitness', label: 'Fitness & Athletic', icon: '🏃' },
+  { value: 'generic', label: 'General Practice', icon: '🎯' },
+];
+
 export function SkillJourneyPanel({
   node,
   onClose,
   onStartFocus,
   className,
 }: SkillJourneyPanelProps) {
-  const { deleteSkill } = useApp();
+  const { deleteSkill, updateSkillCategory } = useApp();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showCategoryMenu, setShowCategoryMenu] = useState(false);
+  const panelRef = useRef<HTMLElement>(null);
+  const categoryMenuRef = useRef<HTMLDivElement>(null);
 
   const progression = node.progression;
-  const profile = getProgressionProfile(node.name, progression?.category);
+  const currentCategory = (progression?.category as SkillCategory) || 'generic';
+  const profile = getProgressionProfile(node.name, currentCategory, node.targetHours || 100);
   const totalHours = progression?.totalHours ?? 0;
   const currentStage = progression?.currentStage ?? profile.stages[0];
   const nextHorizon = progression?.nextVisualMilestoneHours;
   const hoursRemaining = progression?.hoursToNextMilestone;
 
-  // Close on Escape key press
+  // 1. Dismiss on Escape key press
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !showDeleteModal) {
@@ -49,6 +64,43 @@ export function SkillJourneyPanel({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose, showDeleteModal]);
+
+  // 2. Dismiss on outside click / tap
+  useEffect(() => {
+    function handlePointerDown(e: PointerEvent) {
+      if (showDeleteModal) return;
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    }
+
+    // Capture pointer events on document
+    const timer = setTimeout(() => {
+      document.addEventListener('pointerdown', handlePointerDown);
+    }, 50);
+
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('pointerdown', handlePointerDown);
+    };
+  }, [onClose, showDeleteModal]);
+
+  // Close category dropdown on click outside
+  useEffect(() => {
+    function handleClickOutsideCategory(e: MouseEvent) {
+      if (
+        categoryMenuRef.current &&
+        !categoryMenuRef.current.contains(e.target as Node)
+      ) {
+        setShowCategoryMenu(false);
+      }
+    }
+    if (showCategoryMenu) {
+      document.addEventListener('mousedown', handleClickOutsideCategory);
+      return () =>
+        document.removeEventListener('mousedown', handleClickOutsideCategory);
+    }
+  }, [showCategoryMenu]);
 
   // Stage progress calculation within the current stage range
   const stageMin = currentStage.minHours;
@@ -65,29 +117,30 @@ export function SkillJourneyPanel({
     onClose();
   };
 
-  const categoryLabelMap: Record<string, string> = {
-    programming: 'Programming',
-    language: 'Language',
-    music: 'Music',
-    creative: 'Creative Arts',
-    fitness: 'Athletic / Fitness',
-    generic: 'General Practice',
+  const handleCategorySelect = (cat: SkillCategory) => {
+    updateSkillCategory(node.id, cat);
+    setShowCategoryMenu(false);
   };
+
+  const currentCategoryInfo =
+    CATEGORY_OPTIONS.find((c) => c.value === currentCategory) || CATEGORY_OPTIONS[5];
 
   return (
     <>
-      {/* ── Mobile Backdrop ──────────────────────────────────── */}
+      {/* ── Mobile Backdrop (Tapping dismisses sheet) ────────── */}
       <div
         onClick={onClose}
         className="fixed inset-0 z-40 bg-black/60 backdrop-blur-xs md:hidden animate-fade-in"
         aria-hidden="true"
       />
 
-      {/* ── Main Skill Journey Container ───────────────────────── */}
+      {/* ── Main Skill Journey Container (Floating Overlay) ───── */}
       <aside
+        ref={panelRef}
+        onPointerDown={(e) => e.stopPropagation()}
         className={cn(
           // Desktop & Tablet Floating Right-Side Panel
-          'md:absolute md:right-3 md:top-3 md:bottom-3 md:w-[350px] lg:w-[380px] md:z-40',
+          'md:absolute md:right-4 md:top-4 md:bottom-4 md:w-[350px] lg:w-[380px] md:z-40',
           'md:rounded-3xl md:border md:border-edge/80 md:bg-[#070a16]/95 md:backdrop-blur-xl md:shadow-2xl md:shadow-black/90',
           // Mobile Fixed Bottom Sheet
           'fixed inset-x-0 bottom-0 z-50 max-h-[85dvh] rounded-t-3xl border-t border-edge/80 bg-[#070a16]/98 backdrop-blur-2xl shadow-2xl p-4 sm:p-5 md:p-5',
@@ -126,8 +179,8 @@ export function SkillJourneyPanel({
                     {node.formattedDuration} invested
                   </span>
                   <span className="text-zinc-600">•</span>
-                  <span className="text-[10px] font-medium text-zinc-500 uppercase tracking-wide">
-                    {categoryLabelMap[profile.category] || 'Practice'}
+                  <span className="text-[10px] font-medium text-zinc-400">
+                    Goal: {node.targetHours}h
                   </span>
                 </div>
               </div>
@@ -157,13 +210,60 @@ export function SkillJourneyPanel({
             </div>
           </div>
 
-          {/* Subtle Emotional Quote */}
-          <div className="px-3 py-1.5 rounded-xl bg-surface/50 border border-edge/30 flex items-center gap-2 text-[11px] text-zinc-400">
-            <Sparkles size={13} className="text-accent flex-shrink-0" />
-            <span className="italic">Your skill universe is expanding.</span>
+          {/* ── 2. Category Switcher (Safe In-Place Editing) ───── */}
+          <div className="relative" ref={categoryMenuRef}>
+            <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-surface/60 border border-edge/50 text-xs">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">
+                  Journey Category:
+                </span>
+                <span className="font-semibold text-zinc-200 flex items-center gap-1">
+                  <span>{currentCategoryInfo.icon}</span>
+                  <span>{currentCategoryInfo.label}</span>
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowCategoryMenu((prev) => !prev)}
+                className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-surface hover:bg-surface-elevated border border-edge/60 text-[11px] font-medium text-accent hover:text-indigo-300 transition-colors cursor-pointer"
+              >
+                <span>Change</span>
+                <ChevronDown size={12} className={cn('transition-transform', showCategoryMenu && 'rotate-180')} />
+              </button>
+            </div>
+
+            {/* Dropdown Menu */}
+            {showCategoryMenu && (
+              <div className="absolute left-0 right-0 top-full mt-1.5 z-50 p-1.5 rounded-2xl bg-[#0b0e22] border border-edge/80 shadow-2xl space-y-1 animate-fade-in">
+                {CATEGORY_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => handleCategorySelect(opt.value)}
+                    className={cn(
+                      'w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-medium text-left transition-colors cursor-pointer',
+                      currentCategory === opt.value
+                        ? 'bg-accent/20 text-accent border border-accent/40 font-bold'
+                        : 'text-zinc-300 hover:bg-surface hover:text-white',
+                    )}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span>{opt.icon}</span>
+                      <span>{opt.label}</span>
+                    </span>
+                    {opt.value === 'generic' ? (
+                      <span className="text-[10px] text-zinc-500">4 Stages</span>
+                    ) : (
+                      <span className="text-[10px] text-zinc-500">Curated</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* ── 2. Current Stage & Horizon Card ─────────────────── */}
+          {/* ── 3. Current Stage & Horizon Card ─────────────────── */}
           <div className="rounded-2xl bg-surface/80 border border-edge/70 p-3.5 space-y-3 shadow-inner">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-accent flex items-center gap-1.5">
@@ -221,18 +321,18 @@ export function SkillJourneyPanel({
             ) : (
               <div className="pt-2 border-t border-edge/30 flex items-center gap-1.5 text-xs text-zinc-300">
                 <Sparkles size={13} className="text-amber-400" />
-                <span className="font-bold">Deep Mastery Achieved</span>
+                <span className="font-bold">Journey Milestone Reached</span>
               </div>
             )}
           </div>
 
-          {/* ── 3. Growth Path Visualization ─────────────────────── */}
+          {/* ── 4. Growth Path Visualization ─────────────────────── */}
           <div className="space-y-2 pt-1">
             <div className="flex items-center justify-between">
               <h4 className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
                 Your Growth Path
               </h4>
-              <span className="text-[10px] text-zinc-500 font-medium">
+              <span className="text-[10px] text-zinc-500 font-medium truncate max-w-[180px]">
                 {profile.title}
               </span>
             </div>
@@ -308,7 +408,7 @@ export function SkillJourneyPanel({
           </div>
         </div>
 
-        {/* ── 4. Primary Start Focus CTA ───────────────────────── */}
+        {/* ── 5. Primary Start Focus CTA ───────────────────────── */}
         <div className="pt-4 mt-2 border-t border-edge/50">
           <Button
             variant="primary"

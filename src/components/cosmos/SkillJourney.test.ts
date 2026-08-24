@@ -35,7 +35,7 @@ describe('Skill Journey Progression Profiles by Category', () => {
   });
 
   it('correctly evaluates Music, Creative, and Fitness profiles', () => {
-    const musicProfile = getProgressionProfile('Piano Practice', 'music');
+    const musicProfile = getProgressionProfile('Piano', 'music');
     expect(musicProfile.stages[2].name).toBe('Repertoire');
 
     const creativeProfile = getProgressionProfile('Drawing', 'creative');
@@ -46,7 +46,17 @@ describe('Skill Journey Progression Profiles by Category', () => {
     expect(fitnessProfile.stages[5].name).toBe('Long-Term Performance');
   });
 
-  it('identifies Deep Mastery beyond maximum stage boundaries', () => {
+  it('correctly provides universal 4-stage generic journey for arbitrary skills', () => {
+    const arbitraryProfile = getProgressionProfile('dfd', 'generic', 100);
+    expect(arbitraryProfile.category).toBe('generic');
+    expect(arbitraryProfile.stages).toHaveLength(4);
+    expect(arbitraryProfile.stages[0].name).toBe('Novice');
+    expect(arbitraryProfile.stages[1].name).toBe('Intermediate');
+    expect(arbitraryProfile.stages[2].name).toBe('Advanced');
+    expect(arbitraryProfile.stages[3].name).toBe('Mastery');
+  });
+
+  it('identifies Deep Mastery beyond maximum stage boundaries for curated profiles', () => {
     const state = getSkillProgressionState('skill-1', 'Python', 1500 * 3600, 15, 'programming');
     expect(state.currentStage.id).toBe('deep-mastery');
     expect(state.nextVisualMilestoneHours).toBeNull();

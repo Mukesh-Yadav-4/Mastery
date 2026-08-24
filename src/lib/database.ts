@@ -2,6 +2,7 @@ import { STORAGE_KEYS, MILESTONE_PERCENTAGES } from './constants';
 import type {
   User,
   Skill,
+  SkillCategory,
   FocusSession,
   MilestoneRecord,
   NewSkillData,
@@ -230,6 +231,28 @@ export function archiveSkill(userId: string, skillId: string): void {
       : s,
   );
   writeJson(STORAGE_KEYS.SKILLS, updated);
+}
+
+export function updateSkillCategory(
+  userId: string,
+  skillId: string,
+  category: SkillCategory,
+): Skill | null {
+  const all = readJson<Skill[]>(STORAGE_KEYS.SKILLS, []);
+  let updatedSkill: Skill | null = null;
+  const updated = all.map((s) => {
+    if (s.id === skillId && s.userId === userId) {
+      updatedSkill = {
+        ...s,
+        category,
+        updatedAt: new Date().toISOString(),
+      };
+      return updatedSkill;
+    }
+    return s;
+  });
+  writeJson(STORAGE_KEYS.SKILLS, updated);
+  return updatedSkill;
 }
 
 export function deleteSkill(userId: string, skillId: string): void {

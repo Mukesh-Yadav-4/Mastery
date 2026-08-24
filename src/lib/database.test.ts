@@ -7,6 +7,7 @@ import {
   getCurrentUser,
   createSkill,
   getSkills,
+  updateSkillCategory,
   archiveSkill,
   deleteSkill,
   createSession,
@@ -282,6 +283,36 @@ describe('Skills', () => {
       targetHours: 50,
     });
     expect(s2.category).toBe('generic');
+  });
+
+  it('updates skill category safely without modifying practice sessions or milestones', () => {
+    const skill = createSkill(userId, {
+      name: 'Legacy Skill',
+      description: '',
+      category: 'generic',
+      icon: '⚡',
+      color: '#3b82f6',
+      targetHours: 100,
+    });
+
+    createSession(userId, skill.id, Date.now() - 3600000, Date.now(), 3600);
+    checkAndCreateMilestones(userId, skill.id, 10, 100);
+
+    expect(skill.category).toBe('generic');
+
+    // Update to programming
+    const updated = updateSkillCategory(userId, skill.id, 'programming');
+    expect(updated?.category).toBe('programming');
+    expect(updated?.id).toBe(skill.id);
+    expect(updated?.targetHours).toBe(100);
+
+    // Verify persisted skills
+    const skills = getSkills(userId);
+    expect(skills[0].category).toBe('programming');
+
+    // Verify sessions and milestones remain intact
+    expect(getSessions(userId)).toHaveLength(1);
+    expect(getMilestones(userId).length).toBeGreaterThan(0);
   });
 
   it('deletes a skill and removes associated sessions and milestones', () => {

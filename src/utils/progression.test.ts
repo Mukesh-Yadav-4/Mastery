@@ -3,12 +3,12 @@ import {
   getSkillProgressionState,
   getProgressionProfile,
   calculateLevelAura,
+  createGenericProgressionProfile,
   PROGRAMMING_PROGRESSION_PROFILE,
   LANGUAGE_PROGRESSION_PROFILE,
   MUSIC_PROGRESSION_PROFILE,
   CREATIVE_PROGRESSION_PROFILE,
   FITNESS_PROGRESSION_PROFILE,
-  GENERIC_PROGRESSION_PROFILE,
 } from './progression';
 
 describe('Progression Profile Model & Category Mapping', () => {
@@ -33,23 +33,102 @@ describe('Progression Profile Model & Category Mapping', () => {
   });
 
   it('correctly maps music, creative, and fitness profiles', () => {
-    const m = getProgressionProfile('Piano Practice');
+    const m = getProgressionProfile('Piano');
     expect(m.id).toBe(MUSIC_PROGRESSION_PROFILE.id);
     expect(m.stages[2].name).toBe('Repertoire');
 
-    const c = getProgressionProfile('Oil Painting');
+    const c = getProgressionProfile('Oil Painting', 'creative');
     expect(c.id).toBe(CREATIVE_PROGRESSION_PROFILE.id);
     expect(c.stages[3].name).toBe('Project Depth');
 
-    const f = getProgressionProfile('Morning Running');
+    const f = getProgressionProfile('Running');
     expect(f.id).toBe(FITNESS_PROGRESSION_PROFILE.id);
     expect(f.stages[1].name).toBe('Consistency');
   });
 
-  it('correctly falls back to generic profile when unrecognized', () => {
-    const g = getProgressionProfile('Random Hobby');
-    expect(g.id).toBe(GENERIC_PROGRESSION_PROFILE.id);
+  it('correctly falls back to generic 4-stage profile when unrecognized', () => {
+    const g = getProgressionProfile('Random Hobby', 'generic', 100);
     expect(g.category).toBe('generic');
+    expect(g.stages).toHaveLength(4);
+    expect(g.stages[0].name).toBe('Novice');
+    expect(g.stages[1].name).toBe('Intermediate');
+    expect(g.stages[2].name).toBe('Advanced');
+    expect(g.stages[3].name).toBe('Mastery');
+  });
+});
+
+describe('Generic 4-Stage Dynamic Target Scaling', () => {
+  it('correctly scales percentage thresholds for Target = 100h', () => {
+    const profile = createGenericProgressionProfile(100);
+    expect(profile.stages[0].name).toBe('Novice');
+    expect(profile.stages[0].minHours).toBe(0);
+    expect(profile.stages[0].maxHours).toBe(10); // 10%
+
+    expect(profile.stages[1].name).toBe('Intermediate');
+    expect(profile.stages[1].minHours).toBe(10);
+    expect(profile.stages[1].maxHours).toBe(40); // 40%
+
+    expect(profile.stages[2].name).toBe('Advanced');
+    expect(profile.stages[2].minHours).toBe(40);
+    expect(profile.stages[2].maxHours).toBe(75); // 75%
+
+    expect(profile.stages[3].name).toBe('Mastery');
+    expect(profile.stages[3].minHours).toBe(75);
+    expect(profile.stages[3].maxHours).toBe(100); // 100%
+  });
+
+  it('correctly scales percentage thresholds for Target = 200h', () => {
+    const profile = createGenericProgressionProfile(200);
+    expect(profile.stages[0].minHours).toBe(0);
+    expect(profile.stages[0].maxHours).toBe(20); // 10%
+
+    expect(profile.stages[1].minHours).toBe(20);
+    expect(profile.stages[1].maxHours).toBe(80); // 40%
+
+    expect(profile.stages[2].minHours).toBe(80);
+    expect(profile.stages[2].maxHours).toBe(150); // 75%
+
+    expect(profile.stages[3].minHours).toBe(150);
+    expect(profile.stages[3].maxHours).toBe(200); // 100%
+  });
+
+  it('correctly scales percentage thresholds for Target = 500h', () => {
+    const profile = createGenericProgressionProfile(500);
+    expect(profile.stages[0].minHours).toBe(0);
+    expect(profile.stages[0].maxHours).toBe(50); // 10%
+
+    expect(profile.stages[1].minHours).toBe(50);
+    expect(profile.stages[1].maxHours).toBe(200); // 40%
+
+    expect(profile.stages[2].minHours).toBe(200);
+    expect(profile.stages[2].maxHours).toBe(375); // 75%
+
+    expect(profile.stages[3].minHours).toBe(375);
+    expect(profile.stages[3].maxHours).toBe(500); // 100%
+  });
+
+  it('evaluates generic stage state accurately at 0%, 10%, 40%, 75%, and 100%+', () => {
+    // Target 100h:
+    // 0h (0%) -> Novice
+    const s0 = getSkillProgressionState('g1', 'dfd', 0, 1, 'generic', 100);
+    expect(s0.currentStage.name).toBe('Novice');
+    expect(s0.hoursToNextMilestone).toBe(10);
+
+    // 25h (25%) -> Intermediate
+    const s25 = getSkillProgressionState('g1', 'dfd', 25 * 3600, 1, 'generic', 100);
+    expect(s25.currentStage.name).toBe('Intermediate');
+
+    // 50h (50%) -> Advanced
+    const s50 = getSkillProgressionState('g1', 'dfd', 50 * 3600, 1, 'generic', 100);
+    expect(s50.currentStage.name).toBe('Advanced');
+
+    // 80h (80%) -> Mastery
+    const s80 = getSkillProgressionState('g1', 'dfd', 80 * 3600, 1, 'generic', 100);
+    expect(s80.currentStage.name).toBe('Mastery');
+
+    // 120h (120%) -> Mastery
+    const s120 = getSkillProgressionState('g1', 'dfd', 120 * 3600, 1, 'generic', 100);
+    expect(s120.currentStage.name).toBe('Mastery');
   });
 });
 
