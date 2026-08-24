@@ -95,6 +95,14 @@ export function Cosmos3DScene({
   const mountRef = useRef<HTMLDivElement | null>(null);
   const labelElsRef = useRef<Map<string, HTMLDivElement>>(new Map());
 
+  const nodesRef = useRef<SceneNodeData[]>(nodes);
+  const rebuildSkillNodesRef = useRef<((currentNodes: SceneNodeData[]) => void) | null>(null);
+
+  useEffect(() => {
+    nodesRef.current = nodes;
+    rebuildSkillNodesRef.current?.(nodes);
+  }, [nodes]);
+
   // Store active selection in ref to avoid re-initializing WebGL on selection change
   const selectedNodeIdRef = useRef<string | undefined>(selectedNodeId);
   useEffect(() => {
@@ -531,9 +539,15 @@ export function Cosmos3DScene({
     coreGroup.add(ring3);
 
     // ── 6. REAL SKILL NODES & PROGRESSION-INFORMED GEOMETRIES ────
+    const nodesContainer = new THREE.Group();
+    scene.add(nodesContainer);
+
+    const curvesContainer = new THREE.Group();
+    scene.add(curvesContainer);
+
     const nodeMeshes = new Map<string, THREE.Group>();
     const nodePointLights = new Map<string, THREE.PointLight>();
-    const curveStreams: Array<{
+    let curveStreams: Array<{
       curve: THREE.CatmullRomCurve3;
       glowTubeMesh: THREE.Mesh;
       basePos: THREE.Vector3;
@@ -557,293 +571,314 @@ export function Cosmos3DScene({
       targetNodeId: string;
     }> = [];
 
-    nodes.forEach((node, idx) => {
-      const posArray = getSpatialPosition(idx, nodes.length);
-      const basePos = new THREE.Vector3(...posArray);
-
-      const nodeGroup = new THREE.Group();
-      nodeGroup.position.copy(basePos);
-      nodeGroup.userData = { id: node.id, nodeData: node };
-      scene.add(nodeGroup);
-      nodeMeshes.set(node.id, nodeGroup);
-
-      const progression = node.progression;
-      const palette = progression?.evolvedPalette;
-      const coreColor = new THREE.Color(
-        palette?.coreColor || node.color || '#818cf8',
-      );
-      const emissiveColor = new THREE.Color(
-        palette?.emissiveColor || node.color || '#818cf8',
-      );
-      const secondaryAccent = new THREE.Color(
-        palette?.secondaryAccent || node.color || '#818cf8',
-      );
-      const rimHighlight = new THREE.Color(
-        palette?.rimHighlight || '#ffffff',
-      );
-      const haloColor = new THREE.Color(
-        palette?.haloColor || node.color || '#818cf8',
-      );
-      const haloOpacity = palette?.haloOpacity ?? 0.22;
-
-      const tier = progression?.structureTier ?? 1;
-      const visualScale = progression?.boundedVisualScale ?? 1.0;
-
-      // ── Core Sphere Mesh (Bounded Emissive Ceiling) ──
-      const nodeGeo = new THREE.SphereGeometry(0.55 * visualScale, 32, 32);
-      const nodeMat = new THREE.MeshStandardMaterial({
-        color: coreColor,
-        emissive: emissiveColor,
-        emissiveIntensity: Math.min(
-          1.25,
-          0.85 + (progression?.levelAuraIntensity ?? 1.0) * 0.25,
-        ),
-        roughness: 0.28,
-        metalness: 0.75,
+    const rebuildSkillNodes = (currentNodes: SceneNodeData[]) => {
+      // 1. Dispose previous node & curve geometries and materials
+      nodesContainer.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          child.geometry?.dispose();
+          if (Array.isArray(child.material)) {
+            child.material.forEach((m) => m.dispose());
+          } else {
+            child.material?.dispose();
+          }
+        }
       });
-      const nodeMesh = new THREE.Mesh(nodeGeo, nodeMat);
-      nodeGroup.add(nodeMesh);
-
-      // ── Concentric Halo Disc (Bounded Opacity) ──
-      const haloGeo = new THREE.RingGeometry(
-        0.7 * visualScale,
-        0.95 * visualScale,
-        32,
-      );
-      const haloMat = new THREE.MeshBasicMaterial({
-        color: haloColor,
-        transparent: true,
-        opacity: Math.min(0.38, haloOpacity),
-        side: THREE.DoubleSide,
+      curvesContainer.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          child.geometry?.dispose();
+          if (Array.isArray(child.material)) {
+            child.material.forEach((m) => m.dispose());
+          } else {
+            child.material?.dispose();
+          }
+        }
       });
-      const haloMesh = new THREE.Mesh(haloGeo, haloMat);
-      haloMesh.rotation.x = Math.PI / 2;
-      nodeGroup.add(haloMesh);
 
-      // ── Progression Structural Archetypes (Tiers 2–6) ────────────
-      if (tier >= 2) {
-        // Tier 2+: Single Incline Metallic Gyro Ring (Harmonious Secondary Accent)
-        const nodeRingGeo = new THREE.TorusGeometry(
-          1.02 * visualScale,
-          0.015,
-          16,
-          60,
+      nodesContainer.clear();
+      curvesContainer.clear();
+      nodeMeshes.clear();
+      nodePointLights.clear();
+      curveStreams = [];
+
+      currentNodes.forEach((node, idx) => {
+        const posArray = getSpatialPosition(idx, currentNodes.length);
+        const basePos = new THREE.Vector3(...posArray);
+
+        const nodeGroup = new THREE.Group();
+        nodeGroup.position.copy(basePos);
+        nodeGroup.userData = { id: node.id, nodeData: node };
+        nodesContainer.add(nodeGroup);
+        nodeMeshes.set(node.id, nodeGroup);
+
+        const progression = node.progression;
+        const palette = progression?.evolvedPalette;
+        const coreColor = new THREE.Color(
+          palette?.coreColor || node.color || '#818cf8',
         );
-        const nodeRingMat = new THREE.MeshStandardMaterial({
-          color: secondaryAccent,
-          emissive: secondaryAccent,
-          emissiveIntensity: 0.85,
-          metalness: 0.92,
-          roughness: 0.12,
-        });
-        const nodeRing = new THREE.Mesh(nodeRingGeo, nodeRingMat);
-        nodeRing.rotation.x = Math.PI / 2.5;
-        nodeGroup.add(nodeRing);
-      }
-
-      if (tier >= 4) {
-        // Tier 4+: Dual Counter-Rotating Metallic Orbital Rings (Rim Spectral Highlight)
-        const ring2Radius = 1.2 * visualScale;
-        const nodeRing2Geo = new THREE.TorusGeometry(
-          ring2Radius,
-          0.012,
-          16,
-          60,
+        const emissiveColor = new THREE.Color(
+          palette?.emissiveColor || node.color || '#818cf8',
         );
-        const nodeRing2Mat = new THREE.MeshStandardMaterial({
-          color: rimHighlight,
-          emissive: secondaryAccent,
-          emissiveIntensity: 0.8,
-          metalness: 0.95,
-          roughness: 0.08,
-        });
-        const nodeRing2 = new THREE.Mesh(nodeRing2Geo, nodeRing2Mat);
-        nodeRing2.rotation.x = -Math.PI / 3;
-        nodeRing2.rotation.y = Math.PI / 4;
-        nodeGroup.add(nodeRing2);
-      }
-
-      if (tier >= 5) {
-        // Tier 5+: Outer Geodesic Accent Lattice Shell
-        const latticeRadius = 0.88 * visualScale;
-        const nodeLatticeGeo = new THREE.IcosahedronGeometry(latticeRadius, 1);
-        const nodeLatticeMat = new THREE.MeshBasicMaterial({
-          color: rimHighlight,
-          wireframe: true,
-          transparent: true,
-          opacity: 0.25,
-        });
-        const nodeLattice = new THREE.Mesh(nodeLatticeGeo, nodeLatticeMat);
-        nodeGroup.add(nodeLattice);
-      }
-
-      if (tier >= 6) {
-        // Tier 6: Triple Gyroscopic Orbital Rings (Deep Mastery with Celestial Platinum/Gold)
-        const ring3Radius = 1.42 * visualScale;
-        const nodeRing3Geo = new THREE.TorusGeometry(
-          ring3Radius,
-          0.01,
-          16,
-          60,
+        const secondaryAccent = new THREE.Color(
+          palette?.secondaryAccent || node.color || '#818cf8',
         );
-        const nodeRing3Mat = new THREE.MeshStandardMaterial({
-          color: rimHighlight,
-          emissive: secondaryAccent,
-          emissiveIntensity: 0.95,
-          metalness: 0.95,
-          roughness: 0.05,
-        });
-        const nodeRing3 = new THREE.Mesh(nodeRing3Geo, nodeRing3Mat);
-        nodeRing3.rotation.y = Math.PI / 2;
-        nodeGroup.add(nodeRing3);
-      }
+        const rimHighlight = new THREE.Color(
+          palette?.rimHighlight || '#ffffff',
+        );
+        const haloColor = new THREE.Color(
+          palette?.haloColor || node.color || '#818cf8',
+        );
+        const haloOpacity = palette?.haloOpacity ?? 0.22;
 
-      // Point Light (Strictly Bounded Radiance)
-      const baseLightIntensity = Math.min(
-        1.6,
-        0.85 + (progression?.levelAuraIntensity ?? 1.0) * 0.35,
-      );
-      const nodeLight = new THREE.PointLight(
-        coreColor,
-        baseLightIntensity,
-        5.5 * visualScale,
-        1.6,
-      );
-      nodeGroup.add(nodeLight);
-      nodePointLights.set(node.id, nodeLight);
+        const tier = progression?.structureTier ?? 1;
+        const visualScale = progression?.boundedVisualScale ?? 1.0;
 
-      // ── 3D Connection Spline with 3 Continuous Energy Beads ─────
-      const midPoint = new THREE.Vector3(
-        basePos.x * 0.5 + (basePos.y > 0 ? 0.35 : -0.35),
-        basePos.y * 0.5 + (basePos.x > 0 ? -0.35 : 0.35),
-        basePos.z * 0.5 + 0.45,
-      );
-
-      const curve = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(0, 0, 0),
-        midPoint,
-        basePos.clone(),
-      ]);
-
-      // A. Hairline Optical Core
-      const coreTubeGeo = new THREE.TubeGeometry(curve, 48, 0.012, 8, false);
-      const coreTubeMat = new THREE.MeshBasicMaterial({
-        color: 0xffffff,
-        transparent: true,
-        opacity: 0.85,
-      });
-      const coreTubeMesh = new THREE.Mesh(coreTubeGeo, coreTubeMat);
-      scene.add(coreTubeMesh);
-
-      // B. Outer Glowing Energy Stream Tube (Blends Skill Color with Core Palette)
-      const glowTubeGeo = new THREE.TubeGeometry(curve, 48, 0.032, 8, false);
-      const glowTubeMat = new THREE.MeshStandardMaterial({
-        color: coreColor,
-        emissive: coreColor,
-        emissiveIntensity: 1.5,
-        transparent: true,
-        opacity: 0.38,
-      });
-      const glowTubeMesh = new THREE.Mesh(glowTubeGeo, glowTubeMat);
-      scene.add(glowTubeMesh);
-
-      // C. 3 Staggered Continuous Traveling Energy Beads per Curve
-      const beads: Array<{ mesh: THREE.Mesh; speed: number; offset: number }> = [];
-
-      const bead1Geo = new THREE.SphereGeometry(0.085, 12, 12);
-      const beadMat1 = new THREE.MeshBasicMaterial({ color: 0xffffff });
-      const beadMesh1 = new THREE.Mesh(bead1Geo, beadMat1);
-      scene.add(beadMesh1);
-      beads.push({ mesh: beadMesh1, speed: 0.28 + (idx % 3) * 0.04, offset: 0.0 });
-
-      const bead2Geo = new THREE.SphereGeometry(0.075, 10, 10);
-      const beadMat2 = new THREE.MeshBasicMaterial({ color: 0xffffff });
-      const beadMesh2 = new THREE.Mesh(bead2Geo, beadMat2);
-      scene.add(beadMesh2);
-      beads.push({ mesh: beadMesh2, speed: 0.32 + (idx % 2) * 0.03, offset: 0.36 });
-
-      const bead3Geo = new THREE.SphereGeometry(0.068, 10, 10);
-      const beadMat3 = new THREE.MeshBasicMaterial({ color: 0xffffff });
-      const beadMesh3 = new THREE.Mesh(bead3Geo, beadMat3);
-      scene.add(beadMesh3);
-      beads.push({ mesh: beadMesh3, speed: 0.26 + (idx % 4) * 0.03, offset: 0.72 });
-
-      // D. Network Pulse Surge Bead
-      const pulseGeo = new THREE.SphereGeometry(0.15, 14, 14);
-      const pulseMat = new THREE.MeshBasicMaterial({
-        color: new THREE.Color(initialPal.pulse),
-        transparent: true,
-        opacity: 0,
-      });
-      const pulseMesh = new THREE.Mesh(pulseGeo, pulseMat);
-      scene.add(pulseMesh);
-
-      // E. Dedicated High-Energy Completion Surge System (Visually distinct from ambient beads)
-      const surgeGroup = new THREE.Group();
-      surgeGroup.visible = false;
-      scene.add(surgeGroup);
-
-      // 1. Lead Luminous Plasma Core (Large, intense standard material)
-      const leadSurgeGeo = new THREE.SphereGeometry(0.28, 16, 16);
-      const leadSurgeMat = new THREE.MeshStandardMaterial({
-        color: 0xffffff,
-        emissive: coreColor,
-        emissiveIntensity: 5.5,
-        roughness: 0.08,
-        metalness: 0.9,
-      });
-      const leadSurgeMesh = new THREE.Mesh(leadSurgeGeo, leadSurgeMat);
-      surgeGroup.add(leadSurgeMesh);
-
-      // 2. Synchronized Trailing Ion Plasma Spheres
-      const trailMeshes: THREE.Mesh[] = [];
-      const trailSizes = [0.22, 0.17, 0.13, 0.09];
-      const trailOffsets = [0.035, 0.07, 0.105, 0.14];
-      trailSizes.forEach((size, tIdx) => {
-        const tGeo = new THREE.SphereGeometry(size, 12, 12);
-        const tMat = new THREE.MeshBasicMaterial({
+        // Core Sphere Mesh (Bounded Emissive Ceiling)
+        const nodeGeo = new THREE.SphereGeometry(0.55 * visualScale, 32, 32);
+        const nodeMat = new THREE.MeshStandardMaterial({
           color: coreColor,
-          transparent: true,
-          opacity: 0.88 - tIdx * 0.18,
+          emissive: emissiveColor,
+          emissiveIntensity: Math.min(
+            1.25,
+            0.85 + (progression?.levelAuraIntensity ?? 1.0) * 0.25,
+          ),
+          roughness: 0.28,
+          metalness: 0.75,
         });
-        const tMesh = new THREE.Mesh(tGeo, tMat);
-        surgeGroup.add(tMesh);
-        trailMeshes.push(tMesh);
-      });
+        const nodeMesh = new THREE.Mesh(nodeGeo, nodeMat);
+        nodeGroup.add(nodeMesh);
 
-      // 3. Dynamic Traveling Point Light that lights up the 3D environment along the curve
-      const surgePointLight = new THREE.PointLight(
-        coreColor,
-        0,
-        9 * visualScale,
-        1.8,
-      );
-      surgeGroup.add(surgePointLight);
+        // Concentric Halo Disc (Bounded Opacity)
+        const haloGeo = new THREE.RingGeometry(
+          0.7 * visualScale,
+          0.95 * visualScale,
+          32,
+        );
+        const haloMat = new THREE.MeshBasicMaterial({
+          color: haloColor,
+          transparent: true,
+          opacity: Math.min(0.38, haloOpacity),
+          side: THREE.DoubleSide,
+        });
+        const haloMesh = new THREE.Mesh(haloGeo, haloMat);
+        haloMesh.rotation.x = Math.PI / 2;
+        nodeGroup.add(haloMesh);
 
-      curveStreams.push({
-        curve,
-        glowTubeMesh,
-        basePos,
-        baseLightIntensity,
-        ampX: 0.2,
-        ampY: 0.28,
-        ampZ: 0.16,
-        phaseX: idx * 1.73 + 0.5,
-        phaseY: idx * 2.41 + 1.2,
-        phaseZ: idx * 1.19 + 2.1,
-        freqX: 0.65 + (idx % 3) * 0.12,
-        freqY: 0.85 + (idx % 4) * 0.10,
-        freqZ: 0.55 + (idx % 2) * 0.15,
-        beads,
-        pulseMesh,
-        surgeGroup,
-        leadSurgeMesh,
-        trailMeshes,
-        trailOffsets,
-        surgePointLight,
-        targetNodeId: node.id,
+        // Progression Structural Archetypes (Tiers 2–6)
+        if (tier >= 2) {
+          const nodeRingGeo = new THREE.TorusGeometry(
+            1.02 * visualScale,
+            0.015,
+            16,
+            60,
+          );
+          const nodeRingMat = new THREE.MeshStandardMaterial({
+            color: secondaryAccent,
+            emissive: secondaryAccent,
+            emissiveIntensity: 0.85,
+            metalness: 0.92,
+            roughness: 0.12,
+          });
+          const nodeRing = new THREE.Mesh(nodeRingGeo, nodeRingMat);
+          nodeRing.rotation.x = Math.PI / 2.5;
+          nodeGroup.add(nodeRing);
+        }
+
+        if (tier >= 4) {
+          const ring2Radius = 1.2 * visualScale;
+          const nodeRing2Geo = new THREE.TorusGeometry(
+            ring2Radius,
+            0.012,
+            16,
+            60,
+          );
+          const nodeRing2Mat = new THREE.MeshStandardMaterial({
+            color: rimHighlight,
+            emissive: secondaryAccent,
+            emissiveIntensity: 0.8,
+            metalness: 0.95,
+            roughness: 0.08,
+          });
+          const nodeRing2 = new THREE.Mesh(nodeRing2Geo, nodeRing2Mat);
+          nodeRing2.rotation.x = -Math.PI / 3;
+          nodeRing2.rotation.y = Math.PI / 4;
+          nodeGroup.add(nodeRing2);
+        }
+
+        if (tier >= 5) {
+          const latticeRadius = 0.88 * visualScale;
+          const nodeLatticeGeo = new THREE.IcosahedronGeometry(latticeRadius, 1);
+          const nodeLatticeMat = new THREE.MeshBasicMaterial({
+            color: rimHighlight,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.25,
+          });
+          const nodeLattice = new THREE.Mesh(nodeLatticeGeo, nodeLatticeMat);
+          nodeGroup.add(nodeLattice);
+        }
+
+        if (tier >= 6) {
+          const ring3Radius = 1.42 * visualScale;
+          const nodeRing3Geo = new THREE.TorusGeometry(
+            ring3Radius,
+            0.01,
+            16,
+            60,
+          );
+          const nodeRing3Mat = new THREE.MeshStandardMaterial({
+            color: rimHighlight,
+            emissive: secondaryAccent,
+            emissiveIntensity: 0.95,
+            metalness: 0.95,
+            roughness: 0.05,
+          });
+          const nodeRing3 = new THREE.Mesh(nodeRing3Geo, nodeRing3Mat);
+          nodeRing3.rotation.y = Math.PI / 2;
+          nodeGroup.add(nodeRing3);
+        }
+
+        // Point Light
+        const baseLightIntensity = Math.min(
+          1.6,
+          0.85 + (progression?.levelAuraIntensity ?? 1.0) * 0.35,
+        );
+        const nodeLight = new THREE.PointLight(
+          coreColor,
+          baseLightIntensity,
+          5.5 * visualScale,
+          1.6,
+        );
+        nodeGroup.add(nodeLight);
+        nodePointLights.set(node.id, nodeLight);
+
+        // 3D Connection Spline with beads
+        const midPoint = new THREE.Vector3(
+          basePos.x * 0.5 + (basePos.y > 0 ? 0.35 : -0.35),
+          basePos.y * 0.5 + (basePos.x > 0 ? -0.35 : 0.35),
+          basePos.z * 0.5 + 0.45,
+        );
+
+        const curve = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(0, 0, 0),
+          midPoint,
+          basePos.clone(),
+        ]);
+
+        const coreTubeGeo = new THREE.TubeGeometry(curve, 48, 0.012, 8, false);
+        const coreTubeMat = new THREE.MeshBasicMaterial({
+          color: 0xffffff,
+          transparent: true,
+          opacity: 0.85,
+        });
+        const coreTubeMesh = new THREE.Mesh(coreTubeGeo, coreTubeMat);
+        curvesContainer.add(coreTubeMesh);
+
+        const glowTubeGeo = new THREE.TubeGeometry(curve, 48, 0.032, 8, false);
+        const glowTubeMat = new THREE.MeshStandardMaterial({
+          color: coreColor,
+          emissive: coreColor,
+          emissiveIntensity: 1.5,
+          transparent: true,
+          opacity: 0.38,
+        });
+        const glowTubeMesh = new THREE.Mesh(glowTubeGeo, glowTubeMat);
+        curvesContainer.add(glowTubeMesh);
+
+        const beads: Array<{ mesh: THREE.Mesh; speed: number; offset: number }> = [];
+
+        const bead1Geo = new THREE.SphereGeometry(0.085, 12, 12);
+        const beadMat1 = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const beadMesh1 = new THREE.Mesh(bead1Geo, beadMat1);
+        curvesContainer.add(beadMesh1);
+        beads.push({ mesh: beadMesh1, speed: 0.28 + (idx % 3) * 0.04, offset: 0.0 });
+
+        const bead2Geo = new THREE.SphereGeometry(0.075, 10, 10);
+        const beadMat2 = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const beadMesh2 = new THREE.Mesh(bead2Geo, beadMat2);
+        curvesContainer.add(beadMesh2);
+        beads.push({ mesh: beadMesh2, speed: 0.32 + (idx % 2) * 0.03, offset: 0.36 });
+
+        const bead3Geo = new THREE.SphereGeometry(0.068, 10, 10);
+        const beadMat3 = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const beadMesh3 = new THREE.Mesh(bead3Geo, beadMat3);
+        curvesContainer.add(beadMesh3);
+        beads.push({ mesh: beadMesh3, speed: 0.26 + (idx % 4) * 0.03, offset: 0.72 });
+
+        const pulseGeo = new THREE.SphereGeometry(0.15, 14, 14);
+        const pulseMat = new THREE.MeshBasicMaterial({
+          color: new THREE.Color(paletteRef.current.pulse),
+          transparent: true,
+          opacity: 0,
+        });
+        const pulseMesh = new THREE.Mesh(pulseGeo, pulseMat);
+        curvesContainer.add(pulseMesh);
+
+        const surgeGroup = new THREE.Group();
+        surgeGroup.visible = false;
+        curvesContainer.add(surgeGroup);
+
+        const leadSurgeGeo = new THREE.SphereGeometry(0.28, 16, 16);
+        const leadSurgeMat = new THREE.MeshStandardMaterial({
+          color: 0xffffff,
+          emissive: coreColor,
+          emissiveIntensity: 5.5,
+          roughness: 0.08,
+          metalness: 0.9,
+        });
+        const leadSurgeMesh = new THREE.Mesh(leadSurgeGeo, leadSurgeMat);
+        surgeGroup.add(leadSurgeMesh);
+
+        const trailMeshes: THREE.Mesh[] = [];
+        const trailSizes = [0.22, 0.17, 0.13, 0.09];
+        const trailOffsets = [0.035, 0.07, 0.105, 0.14];
+        trailSizes.forEach((size, tIdx) => {
+          const tGeo = new THREE.SphereGeometry(size, 12, 12);
+          const tMat = new THREE.MeshBasicMaterial({
+            color: coreColor,
+            transparent: true,
+            opacity: 0.88 - tIdx * 0.18,
+          });
+          const tMesh = new THREE.Mesh(tGeo, tMat);
+          surgeGroup.add(tMesh);
+          trailMeshes.push(tMesh);
+        });
+
+        const surgePointLight = new THREE.PointLight(
+          coreColor,
+          0,
+          9 * visualScale,
+          1.8,
+        );
+        surgeGroup.add(surgePointLight);
+
+        curveStreams.push({
+          curve,
+          glowTubeMesh,
+          basePos,
+          baseLightIntensity,
+          ampX: 0.2,
+          ampY: 0.28,
+          ampZ: 0.16,
+          phaseX: idx * 1.73 + 0.5,
+          phaseY: idx * 2.41 + 1.2,
+          phaseZ: idx * 1.19 + 2.1,
+          freqX: 0.65 + (idx % 3) * 0.12,
+          freqY: 0.85 + (idx % 4) * 0.10,
+          freqZ: 0.55 + (idx % 2) * 0.15,
+          beads,
+          pulseMesh,
+          surgeGroup,
+          leadSurgeMesh,
+          trailMeshes,
+          trailOffsets,
+          surgePointLight,
+          targetNodeId: node.id,
+        });
       });
-    });
+    };
+
+    rebuildSkillNodesRef.current = rebuildSkillNodes;
+    rebuildSkillNodes(nodesRef.current);
 
     // ── 7. Raycaster for Click Detection ─────────────────────────
     const raycaster = new THREE.Raycaster();
@@ -1272,6 +1307,7 @@ export function Cosmos3DScene({
 
     // ── 10. Complete Cleanup on Unmount ──────────────────────────
     return () => {
+      rebuildSkillNodesRef.current = null;
       if (animFrameId) cancelAnimationFrame(animFrameId);
       resizeObserver.disconnect();
       renderer.domElement.removeEventListener('click', handleCanvasClick);
@@ -1281,7 +1317,7 @@ export function Cosmos3DScene({
       composer.dispose();
       renderer.dispose();
     };
-  }, [nodes, globalLevel]);
+  }, [globalLevel]);
 
   return (
     <div
