@@ -34,6 +34,7 @@ export function createSyntheticFeedbackEvent(
     preSkillLevel.level,
     skill.category,
     skill.targetHours,
+    skill.color,
   );
 
   const xpBreakdown = getSessionXPBreakdown(durationSeconds, 'completed');
@@ -52,6 +53,7 @@ export function createSyntheticFeedbackEvent(
     postSkillLevel.level,
     skill.category,
     skill.targetHours,
+    skill.color,
   );
 
   let crossedHorizon =

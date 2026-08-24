@@ -32,13 +32,24 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
   // Map ONLY real active user skills into 3D scene node data with progression profiles
   const sceneNodes: SceneNodeData[] = useMemo(() => {
     return skillProgress.map((sp) => {
+      // If there's an active feedback event for this skill, hold at pre-completion state until user presses Continue
+      const isTargetOfFeedback =
+        activeFeedbackEvent && activeFeedbackEvent.skillId === sp.skill.id;
+      const effectiveSeconds = isTargetOfFeedback
+        ? activeFeedbackEvent.previousSeconds
+        : sp.totalSeconds;
+      const effectiveLevel = isTargetOfFeedback
+        ? activeFeedbackEvent.previousSkillLevel.level
+        : sp.skillLevel.level;
+
       const progression = getSkillProgressionState(
         sp.skill.id,
         sp.skill.name,
-        sp.totalSeconds,
-        sp.skillLevel.level,
+        effectiveSeconds,
+        effectiveLevel,
         sp.skill.category,
         sp.skill.targetHours,
+        sp.skill.color,
       );
 
       return {
@@ -46,16 +57,24 @@ export function HomeCosmos({ onOpenCreateSkill }: { onOpenCreateSkill: () => voi
         name: sp.skill.name,
         icon: sp.skill.icon,
         color: sp.skill.color,
-        level: sp.skillLevel.level,
-        xp: sp.skillXP,
-        totalHours: sp.totalHours,
-        formattedDuration: formatDuration(sp.totalSeconds),
+        level: effectiveLevel,
+        xp: isTargetOfFeedback
+          ? sp.skillXP - activeFeedbackEvent.xpEarned
+          : sp.skillXP,
+        totalHours: effectiveSeconds / 3600,
+        formattedDuration: formatDuration(effectiveSeconds),
         targetHours: sp.skill.targetHours,
-        percentage: sp.percentage,
+        percentage:
+          sp.skill.targetHours > 0
+            ? Math.min(
+                100,
+                (effectiveSeconds / (sp.skill.targetHours * 3600)) * 100,
+              )
+            : 0,
         progression,
       };
     });
-  }, [skillProgress]);
+  }, [skillProgress, activeFeedbackEvent]);
 
   // Selected node state
   const [selectedNodeId, setSelectedNodeId] = useState<string>(() => {

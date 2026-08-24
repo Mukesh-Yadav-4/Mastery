@@ -190,7 +190,7 @@ function CosmicDevToolsContent() {
                   { label: '1h', min: 60 },
                   { label: '2h', min: 120 },
                   { label: '5h', min: 300 },
-                  { label: '25h', min: 1500 },
+                  { label: '20h', min: 1200 },
                   { label: '50h', min: 3000 },
                 ].map((preset) => (
                   <button

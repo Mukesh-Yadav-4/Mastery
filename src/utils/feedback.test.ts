@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { getSkillProgressionState } from './progression';
-import { getSessionXPBreakdown, secondsToHours, calculateLevelInfo } from './calculations';
+import { getSkillProgressionState, calculateLevelAura } from './progression';
+import { getSessionXPBreakdown } from './calculations';
+import { getEvolvedSkillPalette } from './palettes';
 import { createSyntheticFeedbackEvent } from './devFeedback';
-import type { Skill, CosmicFeedbackEvent } from '../types';
+import type { Skill } from '../types';
 
-describe('Phase 6 — Cosmic Feedback Experience & Event Architecture', () => {
+describe('Phase 6 — Cosmic Feedback Experience & Progression Refinements', () => {
   const mockSkill: Skill = {
     id: 'skill-dev-1',
     userId: 'user-1',
@@ -48,12 +49,12 @@ describe('Phase 6 — Cosmic Feedback Experience & Event Architecture', () => {
     // Skill at 9.8 hours (Stage 1 / Novice in Generic 100h)
     const preHours = 9.8;
     const preSecs = preHours * 3600;
-    const preProgression = getSkillProgressionState('skill-1', 'TypeScript', preSecs, 2, 'generic', 100);
+    const preProgression = getSkillProgressionState('skill-1', 'TypeScript', preSecs, 2, 'generic', 100, '#818cf8');
 
     // Completed 1 hour session (takes total to 10.8 hours -> crosses 10h Novice checkpoint & enters Intermediate Stage 2)
     const postHours = 10.8;
     const postSecs = postHours * 3600;
-    const postProgression = getSkillProgressionState('skill-1', 'TypeScript', postSecs, 2, 'generic', 100);
+    const postProgression = getSkillProgressionState('skill-1', 'TypeScript', postSecs, 2, 'generic', 100, '#818cf8');
 
     const crossedHorizon =
       postProgression.structureTier > preProgression.structureTier ||
@@ -67,46 +68,48 @@ describe('Phase 6 — Cosmic Feedback Experience & Event Architecture', () => {
     expect(postProgression.currentStage.name).toBe('Intermediate');
   });
 
-  it('constructs a complete CosmicFeedbackEvent data contract', () => {
-    const preLevel = calculateLevelInfo(500);
-    const postLevel = calculateLevelInfo(534);
-    const preProg = getSkillProgressionState('s1', 'Piano', 36000, 3, 'music', 500);
-    const postProg = getSkillProgressionState('s1', 'Piano', 40000, 3, 'music', 500);
+  it('enforces strictly bounded idle aura and emissive ceilings to prevent white-hot LED nodes', () => {
+    // Test across progression levels 1 to 50
+    const levelsToTest = [1, 2, 5, 10, 20, 50];
 
-    const event: CosmicFeedbackEvent = {
-      id: 'test-event-1',
-      skillId: 's1',
-      skillName: 'Piano',
-      skillIcon: '🎹',
-      skillColor: '#f59e0b',
-      durationSeconds: 1800,
-      xpEarned: 34,
-      baseXP: 30,
-      bonusXP: 4,
-      previousSeconds: 36000,
-      newSeconds: 40000,
-      previousHours: secondsToHours(36000),
-      newHours: secondsToHours(40000),
-      previousGlobalLevel: preLevel,
-      newGlobalLevel: postLevel,
-      previousSkillLevel: preLevel,
-      newSkillLevel: postLevel,
-      didLevelUp: false,
-      didSkillLevelUp: false,
-      crossedHorizon: false,
-      newHorizonHours: postProg.nextVisualMilestoneHours,
-      crossedStage: false,
-      previousStageName: preProg.currentStage.name,
-      newStageName: postProg.currentStage.name,
-      stageTransitionTriggered: false,
-      significance: 'normal',
-    };
+    levelsToTest.forEach((lvl) => {
+      const aura = calculateLevelAura(lvl);
+      // Hard ceiling assertions
+      expect(aura.auraIntensity).toBeLessThanOrEqual(1.45);
+      expect(aura.auraIntensity).toBeGreaterThanOrEqual(1.0);
+      expect(aura.haloOpacity).toBeLessThanOrEqual(0.38);
+      expect(aura.haloOpacity).toBeGreaterThanOrEqual(0.20);
+      expect(aura.emissiveIntensity).toBeLessThanOrEqual(1.35);
+      expect(aura.emissiveIntensity).toBeGreaterThanOrEqual(0.85);
+    });
+  });
 
-    expect(event.skillName).toBe('Piano');
-    expect(event.durationSeconds).toBe(1800);
-    expect(event.xpEarned).toBe(34);
-    expect(event.significance).toBe('normal');
-    expect(event.newHours).toBeGreaterThan(event.previousHours);
+  it('evolves skill color palette with chromatic richness across practice stages', () => {
+    const baseColor = '#818cf8';
+
+    // 1. Stage 1: Foundation (<10h)
+    const p1 = getEvolvedSkillPalette(baseColor, 5, 1);
+    expect(p1.stage).toBe('foundation');
+    expect(p1.coreColor).toBe(baseColor);
+    expect(p1.haloOpacity).toBe(0.22);
+
+    // 2. Stage 2: Intermediate (10h - 30h)
+    const p2 = getEvolvedSkillPalette(baseColor, 20, 2);
+    expect(p2.stage).toBe('intermediate');
+    expect(p2.coreColor).not.toBe(baseColor); // Richer chromatic core
+    expect(p2.secondaryAccent).toBeDefined();
+    expect(p2.haloOpacity).toBe(0.28);
+
+    // 3. Stage 3: Advanced (30h - 100h)
+    const p3 = getEvolvedSkillPalette(baseColor, 50, 4);
+    expect(p3.stage).toBe('advanced');
+    expect(p3.haloOpacity).toBe(0.34);
+
+    // 4. Stage 4: Mastery (100h+)
+    const p4 = getEvolvedSkillPalette(baseColor, 150, 6);
+    expect(p4.stage).toBe('mastery');
+    expect(p4.secondaryAccent).toBeDefined();
+    expect(p4.haloOpacity).toBe(0.38);
   });
 
   it('ensures session XP calculation is purely idempotent', () => {
@@ -117,9 +120,9 @@ describe('Phase 6 — Cosmic Feedback Experience & Event Architecture', () => {
   });
 
   it('ensures progression state evolves monotonically', () => {
-    const s0 = getSkillProgressionState('s1', 'Go', 0, 1, 'generic', 100);
-    const s1 = getSkillProgressionState('s1', 'Go', 3600 * 10, 2, 'generic', 100);
-    const s2 = getSkillProgressionState('s1', 'Go', 3600 * 50, 5, 'generic', 100);
+    const s0 = getSkillProgressionState('s1', 'Go', 0, 1, 'generic', 100, '#818cf8');
+    const s1 = getSkillProgressionState('s1', 'Go', 3600 * 10, 2, 'generic', 100, '#818cf8');
+    const s2 = getSkillProgressionState('s1', 'Go', 3600 * 50, 5, 'generic', 100, '#818cf8');
 
     expect(s1.boundedVisualScale).toBeGreaterThanOrEqual(s0.boundedVisualScale);
     expect(s2.boundedVisualScale).toBeGreaterThanOrEqual(s1.boundedVisualScale);
@@ -133,7 +136,7 @@ describe('Phase 6 — Cosmic Feedback Experience & Event Architecture', () => {
       60 * 60,   // 1h
       120 * 60,  // 2h
       300 * 60,  // 5h
-      1500 * 60, // 25h
+      1200 * 60, // 20h
       3000 * 60, // 50h
     ];
 
