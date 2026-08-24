@@ -3,6 +3,7 @@ import {
   signUp,
   signIn,
   signOut,
+  resetPassword,
   getCurrentUser,
   createSkill,
   getSkills,
@@ -93,10 +94,94 @@ describe('Auth', () => {
     expect(user?.email).toBe('test@test.com');
   });
 
-  it('clears session on sign out', () => {
-    signUp('test@test.com', 'password123');
+  it('clears session on sign out without deleting registered user accounts', () => {
+    const created = signUp('persistent@test.com', 'password123');
+    expect(getCurrentUser()?.id).toBe(created.id);
+
     signOut();
     expect(getCurrentUser()).toBeNull();
+
+    // Re-authenticating with same credentials works perfectly
+    const relogged = signIn('persistent@test.com', 'password123');
+    expect(relogged.id).toBe(created.id);
+    expect(relogged.email).toBe('persistent@test.com');
+  });
+
+  it('handles email case-insensitivity and whitespace seamlessly', () => {
+    signUp('  MyEmail@Example.COM  ', 'secret123');
+    signOut();
+
+    // Different case & trimming during sign in
+    const user1 = signIn('myemail@example.com', 'secret123');
+    expect(user1.email).toBe('myemail@example.com');
+    signOut();
+
+    const user2 = signIn('  MYEMAIL@EXAMPLE.COM  ', 'secret123');
+    expect(user2.email).toBe('myemail@example.com');
+  });
+
+  it('handles password whitespace trimming consistently', () => {
+    signUp('trimtest@test.com', 'password123  ');
+    signOut();
+
+    const user = signIn('trimtest@test.com', '  password123');
+    expect(user.email).toBe('trimtest@test.com');
+  });
+
+  it('rejects unknown email during sign in', () => {
+    expect(() => signIn('unknown@test.com', 'password123')).toThrow(
+      'Invalid email or password',
+    );
+  });
+
+  it('allows password reset and logs in with new credentials', () => {
+    signUp('resetme@test.com', 'oldpassword');
+    signOut();
+
+    expect(() => signIn('resetme@test.com', 'newpassword')).toThrow();
+
+    const resetUser = resetPassword('resetme@test.com', 'newpassword');
+    expect(resetUser.email).toBe('resetme@test.com');
+    expect(getCurrentUser()?.email).toBe('resetme@test.com');
+
+    signOut();
+    const relogged = signIn('resetme@test.com', 'newpassword');
+    expect(relogged.email).toBe('resetme@test.com');
+  });
+
+  it('preserves user skills, sessions, and milestones through multiple logout/login cycles', () => {
+    // 1. User signs up
+    const user = signUp('practice_master@test.com', 'securePassword');
+
+    // 2. User creates skills and logs sessions
+    const skill = createSkill(user.id, {
+      name: 'Python',
+      description: 'Code practice',
+      icon: '🐍',
+      color: '#3b82f6',
+      targetHours: 100,
+    });
+    createSession(user.id, skill.id, Date.now() - 36000000, Date.now(), 36000);
+    checkAndCreateMilestones(user.id, skill.id, 10, 100);
+
+    // 3. User logs out
+    signOut();
+    expect(getCurrentUser()).toBeNull();
+
+    // 4. User logs back in
+    const activeSessionUser = signIn('practice_master@test.com', 'securePassword');
+    expect(activeSessionUser.id).toBe(user.id);
+
+    // 5. Verify all user data is intact
+    const userSkills = getSkills(activeSessionUser.id);
+    const userSessions = getSessions(activeSessionUser.id);
+    const userMilestones = getMilestones(activeSessionUser.id);
+
+    expect(userSkills).toHaveLength(1);
+    expect(userSkills[0].name).toBe('Python');
+    expect(userSessions).toHaveLength(1);
+    expect(userSessions[0].durationSeconds).toBe(36000);
+    expect(userMilestones.length).toBeGreaterThan(0);
   });
 });
 

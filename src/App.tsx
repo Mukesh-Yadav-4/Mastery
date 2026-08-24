@@ -72,6 +72,17 @@ function AppRouter() {
     };
   }, [user]);
 
+  // Automatically sync route on user auth change
+  useEffect(() => {
+    if (user && (route === 'signin' || route === 'signup')) {
+      setRoute('app');
+      window.history.replaceState(null, '', '#/app');
+    } else if (!user && route === 'app') {
+      setRoute('landing');
+      window.history.replaceState(null, '', '#/landing');
+    }
+  }, [user, route]);
+
   const navigateTo = useCallback((newRoute: AppRoute) => {
     setRoute(newRoute);
     if (newRoute === 'signin') {

@@ -44,25 +44,26 @@ interface StoredUser {
 
 export function signUp(email: string, password: string): User {
   const trimmedEmail = email.trim().toLowerCase();
+  const trimmedPassword = password.trim();
 
-  if (!trimmedEmail || !trimmedEmail.includes('@')) {
+  if (!trimmedEmail || !trimmedEmail.includes('@') || !trimmedEmail.includes('.')) {
     throw new Error('Please enter a valid email address');
   }
 
-  if (password.length < 6) {
+  if (trimmedPassword.length < 6) {
     throw new Error('Password must be at least 6 characters');
   }
 
   const users = readJson<StoredUser[]>(STORAGE_KEYS.USERS, []);
 
-  if (users.some((u) => u.email === trimmedEmail)) {
+  if (users.some((u) => u.email.trim().toLowerCase() === trimmedEmail)) {
     throw new Error('An account with this email already exists');
   }
 
   const user: StoredUser = {
     id: generateId(),
     email: trimmedEmail,
-    password, // localStorage only — never sent to network
+    password: trimmedPassword, // localStorage only — never sent to network
     createdAt: new Date().toISOString(),
   };
 
@@ -81,9 +82,17 @@ export function signUp(email: string, password: string): User {
 
 export function signIn(email: string, password: string): User {
   const trimmedEmail = email.trim().toLowerCase();
+  const trimmedPassword = password.trim();
+
+  if (!trimmedEmail || !trimmedPassword) {
+    throw new Error('Invalid email or password');
+  }
+
   const users = readJson<StoredUser[]>(STORAGE_KEYS.USERS, []);
   const user = users.find(
-    (u) => u.email === trimmedEmail && u.password === password,
+    (u) =>
+      u.email.trim().toLowerCase() === trimmedEmail &&
+      u.password.trim() === trimmedPassword,
   );
 
   if (!user) {
@@ -101,20 +110,26 @@ export function signIn(email: string, password: string): User {
 
 export function resetPassword(email: string, newPassword: string): User {
   const trimmedEmail = email.trim().toLowerCase();
-  if (newPassword.length < 6) {
+  const trimmedPassword = newPassword.trim();
+
+  if (!trimmedEmail || !trimmedEmail.includes('@')) {
+    throw new Error('Please enter a valid email address');
+  }
+
+  if (trimmedPassword.length < 6) {
     throw new Error('Password must be at least 6 characters');
   }
 
   const users = readJson<StoredUser[]>(STORAGE_KEYS.USERS, []);
-  let user = users.find((u) => u.email === trimmedEmail);
+  let user = users.find((u) => u.email.trim().toLowerCase() === trimmedEmail);
 
   if (user) {
-    user.password = newPassword;
+    user.password = trimmedPassword;
   } else {
     user = {
       id: generateId(),
       email: trimmedEmail,
-      password: newPassword,
+      password: trimmedPassword,
       createdAt: new Date().toISOString(),
     };
     users.push(user);

@@ -133,6 +133,19 @@ export function AuthPage({ initialMode = 'signin', onNavigateHome }: AuthPagePro
                   🔑 Set password & Sign in as {email}
                 </button>
               )}
+              {mode === 'signup' && displayError.includes('already exists') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('signin');
+                    setLocalError(null);
+                    clearError();
+                  }}
+                  className="text-xs text-accent hover:underline font-semibold block mx-auto cursor-pointer"
+                >
+                  👉 Switch to Sign in
+                </button>
+              )}
             </div>
           ) : null}
 

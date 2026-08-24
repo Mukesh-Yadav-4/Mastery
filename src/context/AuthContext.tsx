@@ -2,7 +2,6 @@ import {
   createContext,
   useContext,
   useState,
-  useEffect,
   useCallback,
 } from 'react';
 import type { ReactNode } from 'react';
@@ -24,16 +23,9 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(() => db.getCurrentUser());
+  const [loading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Check for existing session on mount
-  useEffect(() => {
-    const currentUser = db.getCurrentUser();
-    setUser(currentUser);
-    setLoading(false);
-  }, []);
 
   const handleSignUp = useCallback((email: string, password: string) => {
     setError(null);
