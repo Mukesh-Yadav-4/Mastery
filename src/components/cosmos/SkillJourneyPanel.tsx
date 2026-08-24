@@ -133,13 +133,13 @@ export function SkillJourneyPanel({
         aria-hidden="true"
       />
 
-      {/* ── Main Skill Journey Container (Compact Floating Overlay) ───── */}
+      {/* ── Main Skill Journey Container (Compact Floating Overlay Below YOUR JOURNEY) ───── */}
       <aside
         ref={panelRef}
         onPointerDown={(e) => e.stopPropagation()}
         className={cn(
-          // Desktop & Tablet: Compact Floating Right-Side Panel (Max Height 480px, sitting below top HUD)
-          'md:absolute md:right-4 md:top-20 md:w-[330px] lg:w-[350px] md:max-h-[490px] md:z-40',
+          // Desktop & Tablet: Floating on the left, positioned safely below YOUR JOURNEY HUD
+          'md:absolute md:left-3 sm:md:left-4 md:top-[128px] md:w-[310px] lg:w-[330px] md:max-h-[min(460px,calc(100dvh-128px-72px))] md:z-40',
           'md:rounded-3xl md:border md:border-edge/80 md:bg-[#070a16]/95 md:backdrop-blur-xl md:shadow-2xl md:shadow-black/90',
           // Mobile Fixed Bottom Sheet
           'fixed inset-x-0 bottom-0 z-50 max-h-[82dvh] rounded-t-3xl border-t border-edge/80 bg-[#070a16]/98 backdrop-blur-2xl shadow-2xl p-4 sm:p-5 md:p-4',
